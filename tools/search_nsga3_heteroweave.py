@@ -1,7 +1,7 @@
-"""DeRy-initialized joint backbone/branch NSGA-III refinement.
+"""HeteroWeave joint backbone/branch NSGA-III search.
 
-This script keeps the original DeRy architecture as the initial backbone and
-searches local refinements under the same resource budget. A candidate can:
+The released search is initialized from the DeRy baseline anchor and explores
+HeteroWeave candidates under the same resource budget. A candidate can:
 
 1. keep or replace a small number of original backbone blocks;
 2. add local branch blocks with sum/gate fusion;
@@ -43,7 +43,7 @@ from tools.search_nsga3_multiobj import (  # noqa: E402
 
 
 METHOD_NOTE = (
-    'We initialize the evolutionary search from the original DeRy architecture '
+    'HeteroWeave search is initialized from the released DeRy baseline anchor '
     'and perform constrained multi-objective refinement. Each candidate is a '
     'local perturbation of the original backbone, optionally augmented with '
     'local branches. The objectives are to maximize proxy-estimated '
@@ -55,12 +55,12 @@ METHOD_NOTE = (
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description='Original-DeRy initialized joint backbone/branch NSGA-III refinement.')
+        description='HeteroWeave joint backbone/branch NSGA-III search.')
     parser.add_argument(
         'backbone_config',
         nargs='?',
         default='configs/imagenet/dery_baseline_100e.py',
-        help='Original DeRy config used as the initialization anchor.')
+        help='Baseline anchor config used to initialize HeteroWeave search.')
     parser.add_argument('--assignment', default='assets/component_pool/assignment_hybrid_4.pkl')
     parser.add_argument('--data-config', default='configs/_base_/datasets/imagenet_bs64_swin_224.py')
     parser.add_argument('--data-prefix', default='data/imagenet/train')
@@ -71,7 +71,7 @@ def parse_args():
     parser.add_argument('--population-size', '--pop-size', dest='population_size', type=int, default=96)
     parser.add_argument('--generations', type=int, default=120)
     parser.add_argument('--seed', type=int, default=0)
-    parser.add_argument('--output-dir', default='simlarity/out/nsga3_dery_refine_30m')
+    parser.add_argument('--output-dir', default='simlarity/out/heteroweave_search_30m')
     parser.add_argument(
         '--proxy',
         choices=[
@@ -110,7 +110,7 @@ def parse_args():
         default=4,
         help=(
             'Maximum samples used for empirical NTK condition. Formula follows '
-            'TE-NAS; this cap avoids OOM on ImageNet-sized DeRy models.'))
+            'TE-NAS; this cap avoids OOM on ImageNet-sized reassembled models.'))
     parser.add_argument(
         '--ntk-num-batch',
         type=int,
@@ -311,7 +311,7 @@ def cache_proxy_batches(data_loader, num_batch):
 
 def compute_swap_scores(cfg, context, args):
     """Compute the three SWAP ablations from one fixed-batch forward."""
-    from tools.evaluate_dery_future_proxy import LogitWrapper
+    from tools.evaluate_heteroweave_proxy import LogitWrapper
     from tools.evaluate_training_free_replacements import ActivationPatternMonitor
 
     torch = context['torch']
@@ -430,6 +430,7 @@ def build_refined_config(base_cfg, primary_blocks, branch_candidate):
     primary_cfgs = [block.print_split() for block in primary_blocks]
     cfg = ea.build_candidate_config(
         base_cfg, primary_cfgs, primary_blocks, branch_candidate)
+    cfg.model.backbone.type = 'HeteroWeave'
     return update_backbone_connections(cfg, primary_blocks)
 
 
@@ -1009,7 +1010,7 @@ def evaluate_refined_candidate(
         size=size,
         flops=flops,
         objectives=objectives,
-        block_list_summary='original DeRy initialized backbone/branch refinement',
+        block_list_summary='HeteroWeave candidate initialized from the DeRy anchor',
         backbone_delta_summary=backbone_delta_summary(primary_blocks, context),
         branch_summary=ea.format_candidate(branch_candidate),
         operator_summary=', '.join(
@@ -1042,7 +1043,7 @@ def make_problem(args, context, pymoo_api, records, source='search'):
     ea = context['ea']
     xl, xu = bounds(context, args)
 
-    class DeRyRefineProblem(pymoo_api['ElementwiseProblem']):
+    class HeteroWeaveSearchProblem(pymoo_api['ElementwiseProblem']):
         def __init__(self):
             super().__init__(n_var=len(xl), n_obj=3, xl=xl, xu=xu)
 
@@ -1059,7 +1060,7 @@ def make_problem(args, context, pymoo_api, records, source='search'):
                 source=source)
             out['F'] = np.asarray(record['objectives'], dtype=float)
 
-    return DeRyRefineProblem()
+    return HeteroWeaveSearchProblem()
 
 
 def run_refine_minimize(pymoo_api, args, context, problem, callback, stage):
@@ -1292,7 +1293,7 @@ def write_search_log(output_dir, args, ref_dirs, generation_logs, records):
         if rec.get('error'):
             failures[str(rec['error']).split(': ', 1)[0]] += 1
     with open(path, 'w', encoding='utf-8') as file:
-        file.write('NSGA-III original-DeRy initialized joint refinement\n')
+        file.write('HeteroWeave NSGA-III joint search\n')
         file.write(METHOD_NOTE + '\n\n')
         file.write(f'backbone_config: {args.backbone_config}\n')
         file.write(f'population_size: {args.population_size}\n')
@@ -1423,7 +1424,7 @@ def main():
     baseline = add_baseline_record(context, args, records_by_key)
     if baseline.get('error') is not None:
         print(
-            'warning: Original DeRy baseline is outside the active search '
+            'warning: Baseline anchor is outside the active search '
             f"budget or failed evaluation: error={baseline.get('error')}, "
             f"size={baseline.get('size')}, flops={baseline.get('flops')}. "
             'Continuing search; invalid baseline will be excluded from the '
@@ -1495,7 +1496,7 @@ def main():
         records)
     json_path = save_records_json(args.output_dir, records)
 
-    print('NSGA-III DeRy refine search complete')
+    print('HeteroWeave NSGA-III search complete')
     print(f'output_dir: {args.output_dir}')
     print(f'pareto_front: {csv_path}')
     print(f'search_log: {log_path}')

@@ -3,7 +3,7 @@ import torch.distributed as dist
 
 from mmcv.runner import HOOKS, Hook
 
-from ..models.backbones.dery import HorizontalCompositeBlock, NeuralAdapter
+from ..models.backbones.heteroweave import HorizontalCompositeBlock, NeuralAdapter
 
 
 def _iter_tensors(value):

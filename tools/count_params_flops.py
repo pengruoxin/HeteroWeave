@@ -29,7 +29,7 @@ def parameter_count(module):
 def main():
     args = parse_args()
     if not args.load_pretrained:
-        os.environ["DERY_DISABLE_PRETRAINED"] = "1"
+        os.environ["HETEROWEAVE_DISABLE_PRETRAINED"] = "1"
     cfg = Config.fromfile(args.config)
     model = build_classifier(cfg.model)
     model.init_weights()

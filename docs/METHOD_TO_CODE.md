@@ -3,7 +3,7 @@
 ## Variable-cardinality composition
 
 `HorizontalCompositeBlock` in
-`mmcls_addon/models/backbones/dery.py` constructs all selected branches at one
+`mmcls_addon/models/backbones/heteroweave.py` constructs all selected branches at one
 functional position. Every branch has an optional input interface, a reusable
 pretrained block, and an optional output interface. Branch outputs are aligned
 and fused.
@@ -19,8 +19,9 @@ mean fusion, HeteroWeave-P (10M/3G) uses gated fusion, and HeteroWeave-E has no
 multi-branch position and therefore requires no fusion operator.
 
 `NeuralAdapter` contains the deterministic CNN-to-CNN, CNN-to-token,
-token-to-CNN, and token-to-token interfaces. `DeRy` is the inherited registry
-name of the assembled backbone. It is not a second method in this code path.
+token-to-CNN, and token-to-token interfaces. HeteroWeave model configurations
+use the `HeteroWeave` backbone registry name. A `DeRy` compatibility alias is
+kept only so that the explicit DeRy baseline configurations remain executable.
 
 `heteroweave/composition.py` provides a small validation reference for the
 nonempty subset constraint. If one pretrained source is instantiated twice,

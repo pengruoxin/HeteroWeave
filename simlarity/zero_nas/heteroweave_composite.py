@@ -1,4 +1,4 @@
-"""Zero-training proxy components for heterogeneous DeRy candidates."""
+"""Zero-training proxy components for heterogeneous HeteroWeave candidates."""
 
 import math
 
@@ -63,7 +63,7 @@ class BlockFeatureMonitor:
         backbone = getattr(model, 'backbone', None)
         blocks = getattr(backbone, 'blocks', None)
         if blocks is None:
-            raise TypeError('Expected a DeRy classifier with model.backbone.blocks.')
+            raise TypeError('Expected a HeteroWeave classifier with model.backbone.blocks.')
         self.outputs = [None for _ in blocks]
         self.handles = []
         for index, block in enumerate(blocks):
@@ -95,7 +95,7 @@ def block_expressivity(model, images, max_vectors=256):
         monitor.close()
         model.train(was_training)
     if not scores:
-        raise RuntimeError('No DeRy block features were captured.')
+        raise RuntimeError('No HeteroWeave block features were captured.')
     expressivity = sum(scores) / len(scores)
     progressivity = (
         min(scores[index] - scores[index - 1]

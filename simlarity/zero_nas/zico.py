@@ -79,7 +79,7 @@ def calculate_normalized_zico(
       parameters.
     - ``clip``: winsorized average ratio, limiting extreme gradient outliers.
 
-    Module scores are then averaged inside each logical DeRy group, and groups
+    Module scores are then averaged inside each logical HeteroWeave group, and groups
     are averaged equally.  No size/FLOPs term is used.
     """
     grouped = {}
@@ -140,7 +140,7 @@ def calculate_normalized_zico(
 
 
 def logical_gradient_group(module_name):
-    """Map Conv/Linear modules to equal-weight DeRy structural groups."""
+    """Map Conv/Linear modules to equal-weight HeteroWeave structural groups."""
     name = module_name
     if name.startswith('classifier.'):
         name = name[len('classifier.'):]
@@ -168,7 +168,7 @@ def calculate_block_zico(
     Original ZiCo uses ``log(sum(parameter ratios))`` for every layer and then
     sums over layers.  That contains explicit width and depth terms.  Here we
     take a median log ratio inside each module, a median inside each logical
-    DeRy block, and finally a median across blocks.  Every logical block has
+    HeteroWeave block, and finally a median across blocks.  Every logical block has
     equal weight regardless of parameter count or number of internal layers.
     """
     grouped = {}

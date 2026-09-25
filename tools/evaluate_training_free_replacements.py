@@ -9,7 +9,7 @@ Scores:
   * SWAP (ICLR 2024): sample-wise activation-pattern cardinality.
   * NASWOT (ICML 2021): activation-code kernel log determinant.
 
-The script never changes model parameters.  DeRy candidates are evaluated at
+The script never changes model parameters.  HeteroWeave candidates are evaluated at
 their actual constructed initialization, including imported pretrained blocks.
 """
 
@@ -32,10 +32,10 @@ from mmcls.datasets import build_dataset
 from mmcls.models import build_classifier
 
 from mmcls_addon import *  # noqa: F401,F403
-from simlarity.zero_nas.dery_composite import first_feature_tensor, feature_matrix
+from simlarity.zero_nas.heteroweave_composite import first_feature_tensor, feature_matrix
 from simlarity.zero_nas.zico import (
     calculate_zico, collect_zico_grad, logical_gradient_group)
-from tools.evaluate_dery_future_proxy import (
+from tools.evaluate_heteroweave_proxy import (
     LogitWrapper, cache_batches, collect_candidates, data_loader,
     load_candidate_config, set_seed, write_csv)
 
@@ -54,7 +54,7 @@ def parse_args():
     parser.add_argument('--pattern', default='pareto_*.py')
     parser.add_argument(
         '--base-config',
-        default='configs/dery/imagenet/30m_imagenet_128x8_100e_dery_adamw.py')
+        default='configs/imagenet/heteroweave_main_100e.py')
     parser.add_argument(
         '--data-config', default='configs/_base_/datasets/imagenet_bs64.py')
     parser.add_argument('--data-prefix', default=None)
@@ -102,7 +102,7 @@ def parse_args():
         help='Skip memory-heavy per-structure-group activation code sets.')
     parser.add_argument(
         '--skip-junction-swap', action='store_true',
-        help='Skip effective-rank health at top-level DeRy block junctions.')
+        help='Skip effective-rank health at top-level HeteroWeave block junctions.')
     parser.add_argument('--num-shards', type=int, default=1)
     parser.add_argument('--shard-index', type=int, default=0)
     parser.add_argument('--resume', action='store_true')
@@ -205,7 +205,7 @@ class ActivationPatternMonitor:
         if selected.ndim == 4:
             selected = selected.mean(dim=(2, 3))
         elif selected.ndim == 3:
-            # DeRy token features use [batch, tokens, channels].
+            # HeteroWeave token features use [batch, tokens, channels].
             selected = selected.mean(dim=1)
         elif selected.ndim > 2:
             selected = selected.reshape(selected.shape[0], -1)
@@ -420,7 +420,7 @@ def centered_kernel_alignment(kernel, target, eps=1e-12):
 
 
 class StageLabelAlignmentMonitor:
-    """Measure class alignment of the four fused DeRy stage outputs."""
+    """Measure class alignment of the four fused HeteroWeave stage outputs."""
 
     def __init__(self, wrapper, labels):
         backbone = getattr(getattr(wrapper, 'model', None), 'backbone', None)
@@ -429,7 +429,7 @@ class StageLabelAlignmentMonitor:
                 getattr(wrapper, 'classifier', None), 'backbone', None)
         blocks = getattr(backbone, 'blocks', None)
         if blocks is None:
-            raise TypeError('Expected a DeRy classifier with backbone.blocks.')
+            raise TypeError('Expected a HeteroWeave classifier with backbone.blocks.')
         labels = labels.detach().view(-1).long().cpu()
         self.target = labels[:, None].eq(labels[None, :]).to(torch.float64)
         self.alignments = []
@@ -458,7 +458,7 @@ class StageLabelAlignmentMonitor:
 
     def scores(self, layer_swap_sqrt_sum):
         if not self.alignments:
-            raise RuntimeError('No DeRy stage outputs were captured.')
+            raise RuntimeError('No HeteroWeave stage outputs were captured.')
         mean_alignment = float(np.mean(self.alignments))
         return {
             'stage_label_alignment_mean': mean_alignment,
@@ -554,14 +554,14 @@ def sample_kernel_metrics(value, eps=1e-6):
 
 
 class JunctionHealthMonitor:
-    """Measure sample-separability changes across top-level DeRy blocks."""
+    """Measure sample-separability changes across top-level HeteroWeave blocks."""
 
     def __init__(self, model):
         classifier = getattr(model, 'classifier', model)
         backbone = getattr(classifier, 'backbone', None)
         blocks = getattr(backbone, 'blocks', None)
         if blocks is None:
-            raise TypeError('Expected a DeRy classifier with backbone.blocks.')
+            raise TypeError('Expected a HeteroWeave classifier with backbone.blocks.')
         self.entries = []
         self.handles = [
             block.register_forward_hook(self._capture(index))
@@ -584,7 +584,7 @@ class JunctionHealthMonitor:
 
     def scores(self, swap_score):
         if not self.entries:
-            raise RuntimeError('No valid DeRy junction metrics were captured.')
+            raise RuntimeError('No valid HeteroWeave junction metrics were captured.')
         pr_delta = [
             math.log(max(row['pr_after'], 1e-12) /
                      max(row['pr_before'], 1e-12))
@@ -702,7 +702,7 @@ def lswag_trainability(gradients, eps=1e-12):
     """L-SWAG equation (1), using all Conv/Linear layers.
 
     The paper selects a depth interval per benchmark.  No such interval is
-    available for DeRy, so the label-free all-layer form is reported rather
+    available for these reassembly candidates, so the label-free all-layer form is reported rather
     than selecting layers using the short-training labels.
     """
     module_scores = []

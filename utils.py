@@ -1,6 +1,6 @@
 """Compatibility classes for the released component-pool pickle.
 
-The pool was serialized by the original DeRy utility module under the name
+The released pool was serialized by a legacy utility module under the name
 ``utils``. Only the two lightweight data containers required for safe loading
 are retained here; feature extraction and similarity computation are not part
 of this release.

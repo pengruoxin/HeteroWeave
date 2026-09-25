@@ -25,12 +25,12 @@ figures, tables, datasets, checkpoints, logs, and archived experiment outputs.
 | Paper concept | Main implementation |
 |---|---|
 | Heterogeneous block extraction | `blocklize/block_meta.py`, `mmcls_addon/models/utils/feature_extraction.py` |
-| Interfaces and composition | `mmcls_addon/models/backbones/dery.py` |
+| Interfaces and composition | `mmcls_addon/models/backbones/heteroweave.py` |
 | Structural baselines | `mmcls_addon/models/backbones/structural_baselines.py` |
 | CLAS reference definition | `heteroweave/clas.py` |
 | Full proxy hooks | `tools/search_nsga3_multiobj.py`, task-specific scripts in `tools/` |
 | Pareto dominance | `heteroweave/pareto.py`, `simlarity/multi_objective.py` |
-| NSGA-III search | `tools/search_nsga3_multiobj.py`, `tools/search_nsga3_dery_refine.py` |
+| NSGA-III search | `tools/search_nsga3_multiobj.py`, `tools/search_nsga3_heteroweave.py` |
 | ImageNet architectures | `configs/imagenet/` |
 | ImageNet structural baselines | `configs/baselines/imagenet/` |
 | Complete-network references | `configs/references/imagenet/` |
@@ -40,9 +40,10 @@ figures, tables, datasets, checkpoints, logs, and archived experiment outputs.
 | Detection | `tools/evaluate_detection_formal_proxy.py`, `tools/train_detection_*.py` |
 
 The inherited internal directory name `simlarity` is intentionally preserved
-because existing imports depend on it. The inherited internal name `DeRy` remains in low-level backbone code.
-Paper-facing terminology follows HeteroWeave and CLAS throughout the release;
-implementation mappings are documented in `docs/METHOD_TO_CODE.md`.
+because existing imports depend on it. HeteroWeave models use the `HeteroWeave`
+backbone registry name throughout the released method code. The `DeRy` name is
+retained only for explicit baseline configurations and attribution. Implementation
+mappings are documented in `docs/METHOD_TO_CODE.md`.
 
 ## Fusion protocol
 

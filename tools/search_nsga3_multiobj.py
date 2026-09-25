@@ -50,7 +50,7 @@ def import_pymoo():
     except ImportError as exc:
         raise SystemExit(
             'pymoo is required for NSGA-III search but is not installed.\n'
-            'Install it in the active DeRy environment with:\n\n'
+            'Install it in the active HeteroWeave environment with:\n\n'
             '  pip install pymoo\n\n'
             f'Original import error: {exc}')
 
@@ -73,7 +73,7 @@ def parse_args():
         'backbone_config',
         nargs='?',
         default='configs/imagenet/dery_baseline_100e.py',
-        help='Fixed DeRy backbone config for local-branch search.')
+        help='Anchor backbone config used to initialize HeteroWeave search.')
     parser.add_argument('--assignment', default='assets/component_pool/assignment_hybrid_4.pkl')
     parser.add_argument('--data-config', default='configs/_base_/datasets/imagenet_bs64_swin_224.py')
     parser.add_argument('--data-prefix', default='data/imagenet/train')
@@ -125,7 +125,7 @@ def parse_args():
             'Minimum retained final candidates for each available gate-only, '
             'sum-only, and mixed branch family. This changes selection only, '
             'never the performance score.'))
-    parser.add_argument('--toy', action='store_true', help='Run with random toy objectives, no DeRy imports.')
+    parser.add_argument('--toy', action='store_true', help='Run with random toy objectives, no HeteroWeave model imports.')
     parser.add_argument('--toy-branches', type=int, default=4)
     parser.add_argument('--minC', dest='min_params', type=float, default=None)
     parser.add_argument('--C', '--maxC', dest='max_params', type=float, default=30.0)
@@ -368,7 +368,7 @@ def write_search_log(output_dir, args, ref_dirs, generation_logs, records):
             failures[str(rec['error']).split(': ', 1)[0]] += 1
 
     with open(path, 'w', encoding='utf-8') as file:
-        file.write('NSGA-III DeRy local-branch multi-objective search\n')
+        file.write('HeteroWeave NSGA-III local-branch multi-objective search\n')
         file.write(METHOD_NOTE + '\n\n')
         file.write(f'population_size: {args.population_size}\n')
         file.write(f'generations: {args.generations}\n')
@@ -489,7 +489,7 @@ def import_real_search_deps():
     import torch
 
     from simlarity.zero_nas import ZeroNas
-    from simlarity.zero_nas.dery_composite import (
+    from simlarity.zero_nas.heteroweave_composite import (
         block_expressivity, empirical_ntk_condition)
     import tools.ea_local_branch_naswot as ea
 
@@ -522,7 +522,7 @@ def cache_proxy_batches(data_loader, num_batch):
 
 
 def compute_swap_scores(candidate, context, args):
-    from tools.evaluate_dery_future_proxy import LogitWrapper
+    from tools.evaluate_heteroweave_proxy import LogitWrapper
     from tools.evaluate_training_free_replacements import ActivationPatternMonitor
 
     torch = context['torch']
@@ -832,7 +832,7 @@ def make_real_problem(args, context, pymoo_api, records):
     ea = context['ea']
     xl, xu = real_bounds(context, args)
 
-    class DeRyLocalBranchProblem(pymoo_api['ElementwiseProblem']):
+    class HeteroWeaveLocalBranchProblem(pymoo_api['ElementwiseProblem']):
         def __init__(self):
             super().__init__(n_var=len(xl), n_obj=3, xl=xl, xu=xu)
 
@@ -963,7 +963,7 @@ def make_real_problem(args, context, pymoo_api, records):
                     size=size,
                     flops=flops,
                     objectives=objectives,
-                    block_list_summary='fixed DeRy backbone with optional CompositeBlock local branches',
+                    block_list_summary='HeteroWeave candidate with optional CompositeBlock local branches',
                     branch_summary=ea.format_candidate(candidate),
                     operator_summary=', '.join(
                         gene.operator for gene in candidate
@@ -972,7 +972,7 @@ def make_real_problem(args, context, pymoo_api, records):
                     error=error)
             out['F'] = np.asarray(records[key]['objectives'], dtype=float)
 
-    return DeRyLocalBranchProblem()
+    return HeteroWeaveLocalBranchProblem()
 
 
 def make_callback(pymoo_api, generation_logs, records_fn):

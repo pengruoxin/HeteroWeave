@@ -28,7 +28,7 @@ from mmcls.datasets import build_dataloader, build_dataset
 from mmcls.models import build_classifier
 
 from mmcls_addon import *  # noqa: F401,F403
-from simlarity.zero_nas.dery_composite import block_expressivity
+from simlarity.zero_nas.heteroweave_composite import block_expressivity
 from simlarity.zero_nas.zico import (
     calculate_block_zico, calculate_gradient_alignment, collect_zico_grad,
     logical_gradient_group)
@@ -59,7 +59,7 @@ def parse_args():
     parser.add_argument('--pattern', default='pareto_*.py')
     parser.add_argument(
         '--base-config',
-        default='configs/dery/imagenet/30m_imagenet_128x8_100e_dery_adamw.py')
+        default='configs/imagenet/heteroweave_main_100e.py')
     parser.add_argument(
         '--data-config', default='configs/_base_/datasets/imagenet_bs64.py')
     parser.add_argument('--data-prefix', default=None)

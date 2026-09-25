@@ -9,7 +9,7 @@ zero-shot proxy instead of ``a * ZiCo + b * NASWOT``.
 import numpy as np
 from torch import nn
 
-from simlarity.zero_nas.dery_composite import first_feature_tensor
+from simlarity.zero_nas.heteroweave_composite import first_feature_tensor
 from simlarity.zero_nas.zico import logical_gradient_group
 
 
@@ -68,7 +68,7 @@ def calculate_wot_conditioned_zico(
         grad_dict, activation_rates_by_block, eps=1e-8):
     """Calculate equal-block ZiCo after NASWOT spectral gradient filtering.
 
-    Each logical DeRy block receives one NASWOT filter.  Conv/Linear gradient
+    Each logical HeteroWeave block receives one NASWOT filter.  Conv/Linear gradient
     observations from that block are filtered across micro-batches before the
     ZiCo signal-to-noise statistic is evaluated.  Medians prevent parameter
     count and layer count from increasing the score mechanically.

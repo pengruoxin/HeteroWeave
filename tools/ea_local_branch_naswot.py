@@ -78,7 +78,7 @@ class ClassifierForwardWrapper(nn.Module):
 
 
 def classifier_size_flops(model, args):
-    """Match tools/analysis_tools/get_flops.py for DeRy FLOPs counting."""
+    """Count parameters and FLOPs for a reassembled backbone."""
     size = sum(param.numel() for param in model.parameters()) / 1e6
     if args.skip_flops_eval:
         return size, 0.0
@@ -104,12 +104,12 @@ def classifier_size_flops(model, args):
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description='EA local-branch search on a fixed DeRy backbone config with zero-cost proxies.')
+        description='EA local-branch search for HeteroWeave candidates with zero-cost proxies.')
     parser.add_argument(
         'backbone_config',
         nargs='?',
-        default='configs/dery/imagenet/10m_imagenet_128x8_100e_dery_adamw.py',
-        help='Existing DeRy config used as the fixed backbone.')
+        default='configs/imagenet/dery_10m3g_100e.py',
+        help='Anchor backbone config used to initialize the search.')
     parser.add_argument(
         '--assignment',
         default='simlarity/out/assignment/assignment_hybrid_4.pkl',
@@ -400,8 +400,9 @@ def find_matching_block(block_cfg, blocks_by_index, index):
 def load_backbone_blocks(config_path, blocks_by_index):
     cfg = Config.fromfile(config_path)
     backbone = cfg.model.backbone
-    if backbone.type != 'DeRy':
-        raise ValueError(f'{config_path} must use model.backbone.type="DeRy"')
+    if backbone.type not in {'HeteroWeave', 'DeRy'}:
+        raise ValueError(
+            f'{config_path} must use a HeteroWeave-compatible backbone registry name')
 
     primary_cfgs = list(backbone.block_list)
     primary_blocks = []
@@ -686,6 +687,7 @@ def build_candidate_config(base_cfg, primary_cfgs, primary_blocks, candidate):
             out_type=feature_type(primary.out_size))
 
     cfg.model.backbone.block_list = block_list
+    cfg.model.backbone.type = 'HeteroWeave'
     return cfg
 
 

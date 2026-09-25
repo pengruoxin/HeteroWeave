@@ -5,7 +5,7 @@ DATA_ROOT="${1:?usage: bash scripts/run_search.sh /path/to/imagenet/train [outpu
 OUTPUT_DIR="${2:-work_dirs/heteroweave_search}"
 PYTHON_BIN="${PYTHON:-python}"
 
-PYTHONPATH="${PWD}" "${PYTHON_BIN}" tools/search_nsga3_dery_refine.py \
+PYTHONPATH="${PWD}" "${PYTHON_BIN}" tools/search_nsga3_heteroweave.py \
   configs/imagenet/dery_baseline_100e.py \
   --assignment assets/component_pool/assignment_hybrid_4.pkl \
   --data-config configs/_base_/datasets/imagenet_bs64_swin_224.py \

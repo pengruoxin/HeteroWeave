@@ -42,7 +42,7 @@ def resolve_checkpoint_path(ckp_path):
         return ckp_path
 
     search_dirs = []
-    pretrained_dir = os.environ.get('DERY_PRETRAINED_DIR')
+    pretrained_dir = os.environ.get('HETEROWEAVE_PRETRAINED_DIR')
     if pretrained_dir:
         search_dirs.append(pretrained_dir)
 
@@ -163,8 +163,8 @@ def network_to_module_subnet(model_name, block_input, block_output, backend, pre
         prefix,
         ckp_path,
     )
-    use_cache = os.environ.get('DERY_DISABLE_BLOCK_CACHE', '0') != '1'
-    disk_cache_dir = os.environ.get('DERY_BLOCK_CACHE_DIR')
+    use_cache = os.environ.get('HETEROWEAVE_DISABLE_BLOCK_CACHE', '0') != '1'
+    disk_cache_dir = os.environ.get('HETEROWEAVE_BLOCK_CACHE_DIR')
     disk_cache_path = None
     if use_cache and disk_cache_dir:
         disk_cache_path = get_subnet_cache_path(
@@ -181,7 +181,7 @@ def network_to_module_subnet(model_name, block_input, block_output, backend, pre
     # Architecture-only utilities (for example FLOPs/parameter counting) do
     # not need pretrained tensors.  Keeping this opt-in avoids network access
     # and checkpoint I/O while preserving the original training behaviour.
-    load_pretrained = os.environ.get('DERY_DISABLE_PRETRAINED', '0') != '1'
+    load_pretrained = os.environ.get('HETEROWEAVE_DISABLE_PRETRAINED', '0') != '1'
 
     # print(model_name, block_input, block_output, backend)
     if backend == 'timm':
@@ -298,7 +298,7 @@ def network_to_module_subnet(model_name, block_input, block_output, backend, pre
 
 
 @BACKBONES.register_module()
-class DeRy(BaseBackbone):
+class HeteroWeave(BaseBackbone):
     """
     """
 
@@ -320,7 +320,7 @@ class DeRy(BaseBackbone):
         init_cfg=None,
         **kwargs,
     ):
-        super(DeRy, self).__init__(init_cfg)
+        super().__init__(init_cfg)
         if train_adapters_only and all_fixed:
             raise ValueError(
                 'train_adapters_only and all_fixed cannot both be enabled')
@@ -475,6 +475,13 @@ class DeRy(BaseBackbone):
                         out = self.capacity_control(out)
                     outs.append(out)
         return tuple(outs)
+
+
+@BACKBONES.register_module()
+class DeRy(HeteroWeave):
+    """Compatibility alias used only by the released DeRy baseline configs."""
+
+    pass
 
 
 class ResidualCapacityControl(nn.Module):

@@ -1,4 +1,4 @@
-"""Pareto-ranking utilities for DeRy search candidates."""
+"""Pareto-ranking utilities for HeteroWeave search candidates."""
 
 import math
 

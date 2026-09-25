@@ -9,18 +9,18 @@ Before a full run:
 1. download the upstream weights under their original terms;
 2. verify the model name and checkpoint checksum;
 3. place files in a local directory excluded by `.gitignore`;
-4. set `DERY_PRETRAINED_DIR` to that directory, or provide the checkpoint path
+4. set `HETEROWEAVE_PRETRAINED_DIR` to that directory, or provide the checkpoint path
    in the candidate configuration;
 5. keep the same weight source for every candidate in a comparison.
 
 Useful environment variables:
 
 ```bash
-export DERY_PRETRAINED_DIR=/path/to/pretrained
-export DERY_BLOCK_CACHE_DIR=/path/to/block_cache
+export HETEROWEAVE_PRETRAINED_DIR=/path/to/pretrained
+export HETEROWEAVE_BLOCK_CACHE_DIR=/path/to/block_cache
 ```
 
-Set `DERY_DISABLE_PRETRAINED=1` only for architecture construction or resource
+Set `HETEROWEAVE_DISABLE_PRETRAINED=1` only for architecture construction or resource
 inspection. Scores and training results produced without pretrained blocks are
 not comparable to the paper experiments.
 

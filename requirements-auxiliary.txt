@@ -1,0 +1,4 @@
+# Install after requirements-core.txt when running auxiliary tasks.
+datasets
+transformers
+fvcore

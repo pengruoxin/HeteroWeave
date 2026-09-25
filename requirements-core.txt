@@ -1,0 +1,13 @@
+# Historical environment used by the MMClassification experiments.
+torch==1.10.2
+torchvision==0.11.3
+mmcv-full==1.4.8
+mmcls==0.25.0
+timm
+numpy
+scipy
+pandas
+scikit-learn
+pymoo
+thop
+Pillow

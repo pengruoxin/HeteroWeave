@@ -1,0 +1,17 @@
+# Canonical ImageNet search protocol reported in the paper.
+aligned_positions: 4
+cardinality_bounds: [1, 2, 2, 2]
+fusion: fixed_mean  # search-time fusion only; final training may use mean or gate
+quality_objective: Clas
+proxy_images: 32
+population_size: 96
+initialization_generations: 40
+search_generations: 120
+objectives:
+  - maximize_Clas
+  - minimize_total_parameters
+  - minimize_feature_extraction_FLOPs
+proxy_data_seed: 11
+proxy_model_seed: 11
+component_pool: assets/component_pool/assignment_hybrid_4.pkl
+component_pool_sha256: 93a8bc3c5d82704216003e42d74341c6739707ce81babdc93a7395de6521ffd0

@@ -1,0 +1,17 @@
+_base_ = ['./_base_100e.py']
+
+model = dict(
+    type='ImageClassifier',
+    backbone=dict(
+        type='SideTuningBaseline', variant='high_r34_mbv3s',
+        fusion_channels=512, pretrained=True, freeze_base=True),
+    neck=dict(type='GlobalAveragePooling'),
+    head=dict(
+        type='LinearClsHead', num_classes=1000, in_channels=512,
+        loss=dict(type='LabelSmoothLoss', label_smooth_val=0.1,
+                  num_classes=1000, reduction='mean', loss_weight=1.0),
+        topk=(1, 5), cal_acc=False),
+    train_cfg=dict(augments=[
+        dict(type='BatchMixup', alpha=0.1, num_classes=1000, prob=0.5),
+        dict(type='BatchCutMix', alpha=1.0, num_classes=1000, prob=0.5),
+    ]))

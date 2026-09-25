@@ -2,13 +2,17 @@
 aligned_positions: 4
 cardinality_bounds: [1, 2, 2, 2]
 fusion: fixed_mean  # search-time fusion only; final training may use mean or gate
-quality_objective: Clas
+paper_objectives:
+  - maximize_performance
+  - minimize_total_parameters
+  - minimize_feature_extraction_FLOPs
+search_performance_proxy: CLAS
 proxy_images: 32
 population_size: 96
 initialization_generations: 40
 search_generations: 120
-objectives:
-  - maximize_Clas
+search_objectives:
+  - maximize_CLAS
   - minimize_total_parameters
   - minimize_feature_extraction_FLOPs
 proxy_data_seed: 11

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Evaluate the frozen detection pool with Layer-SWAP Sqrt and resources."""
+"""Evaluate the frozen detection pool with CLAS and resource metrics."""
 
 import argparse
 import csv
@@ -125,8 +125,8 @@ def main():
         row = {
             **candidate,
             "panel_scores": json.dumps(scores),
-            "layer_swap_sqrt_mean": "" if not scores else float(np.mean(scores)),
-            "layer_swap_sqrt_std": "" if not scores else float(np.std(scores)),
+            "CLAS_mean": "" if not scores else float(np.mean(scores)),
+            "CLAS_std": "" if not scores else float(np.std(scores)),
             "baseline_or_diagnostic_position_details": json.dumps(position_details),
             "forbidden_all_position_sum_diagnostic": json.dumps(diagnostic_totals),
             "activation_layer_count": json.dumps(layer_counts),

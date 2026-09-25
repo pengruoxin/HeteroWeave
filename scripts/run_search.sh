@@ -10,7 +10,7 @@ PYTHONPATH="${PWD}" "${PYTHON_BIN}" tools/search_nsga3_dery_refine.py \
   --assignment assets/component_pool/assignment_hybrid_4.pkl \
   --data-config configs/_base_/datasets/imagenet_bs64_swin_224.py \
   --data-prefix "${DATA_ROOT}" \
-  --proxy layer_swap_sqrt \
+  --proxy CLAS \
   --swap-image-count 32 \
   --proxy-data-seed 11 \
   --proxy-model-seed 11 \

@@ -1,6 +1,6 @@
-"""Dependency-light reference implementation of Clas.
+"""Dependency-light reference implementation of CLAS.
 
-Clas counts activation patterns at each evaluated functional position and
+CLAS counts activation patterns at each evaluated functional position and
 uses square-root aggregation to reduce score growth caused only by an enlarged
 activation space. The full model hooks used by the experiments live in the
 task entry points under ``tools/``.
@@ -15,7 +15,7 @@ import numpy as np
 
 
 def clas_from_pattern_counts(pattern_counts: Iterable[int]) -> float:
-    """Return the Clas score from nonnegative position-level pattern counts."""
+    """Return the CLAS score from nonnegative position-level pattern counts."""
     counts = [int(value) for value in pattern_counts]
     if not counts:
         raise ValueError("at least one pattern count is required")
@@ -34,7 +34,7 @@ def _unique_binary_patterns(activation: np.ndarray) -> int:
 
 
 def clas_from_activations(activations: Sequence[np.ndarray]) -> float:
-    """Compute Clas from activation tensors collected at search positions."""
+    """Compute CLAS from activation tensors collected at search positions."""
     if not activations:
         raise ValueError("at least one activation tensor is required")
     return clas_from_pattern_counts(

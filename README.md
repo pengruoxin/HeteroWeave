@@ -10,7 +10,8 @@ figures, tables, datasets, checkpoints, logs, and archived experiment outputs.
 - variable-cardinality block composition and heterogeneous interfaces;
 - fixed mean fusion during architecture search, plus mean/gated fusion for full training;
 - the capacity-control implementation;
-- Clas, the activation-pattern quality proxy;
+- CLAS, the training-free activation-pattern proxy for candidate performance;
+- explicit separation between the paper-level performance objective and its search-time CLAS proxy;
 - three-objective Pareto utilities and NSGA-III search code;
 - all ImageNet models and baselines appearing in the paper;
 - explicit R1--R3, S1--S4, and D1--D3 auxiliary-task definitions;
@@ -26,7 +27,7 @@ figures, tables, datasets, checkpoints, logs, and archived experiment outputs.
 | Heterogeneous block extraction | `blocklize/block_meta.py`, `mmcls_addon/models/utils/feature_extraction.py` |
 | Interfaces and composition | `mmcls_addon/models/backbones/dery.py` |
 | Structural baselines | `mmcls_addon/models/backbones/structural_baselines.py` |
-| Clas reference definition | `heteroweave/clas.py` |
+| CLAS reference definition | `heteroweave/clas.py` |
 | Full proxy hooks | `tools/search_nsga3_multiobj.py`, task-specific scripts in `tools/` |
 | Pareto dominance | `heteroweave/pareto.py`, `simlarity/multi_objective.py` |
 | NSGA-III search | `tools/search_nsga3_multiobj.py`, `tools/search_nsga3_dery_refine.py` |
@@ -39,9 +40,9 @@ figures, tables, datasets, checkpoints, logs, and archived experiment outputs.
 | Detection | `tools/evaluate_detection_formal_proxy.py`, `tools/train_detection_*.py` |
 
 The inherited internal directory name `simlarity` is intentionally preserved
-because existing imports depend on it. Historical internal names such as
-`DeRy` and `layer_swap_sqrt` remain in low-level code; their paper-facing
-HeteroWeave/Clas mapping is documented in `docs/METHOD_TO_CODE.md`.
+because existing imports depend on it. The inherited internal name `DeRy` remains in low-level backbone code.
+Paper-facing terminology follows HeteroWeave and CLAS throughout the release;
+implementation mappings are documented in `docs/METHOD_TO_CODE.md`.
 
 ## Fusion protocol
 
@@ -71,8 +72,8 @@ ImageNet configuration.
 ## Environment
 
 The main ImageNet code was developed with Python 3.8, PyTorch 1.10.2,
-torchvision 0.11.3, CUDA 11.3, MMCV 1.4.8, and MMClassification 0.25.0.
-That stack is the reproducibility target for the MMClassification pipeline.
+torchvision 0.11.3, CUDA 11.3, MMCV 1.4.8, and MMCLASsification 0.25.0.
+That stack is the reproducibility target for the MMCLASsification pipeline.
 
 ```bash
 conda create -n heteroweave python=3.8 -y
@@ -145,12 +146,12 @@ bash scripts/train_detection_models.sh \
   /path/to/VOC BYOL.pth work_dirs/detection_protocol.json work_dirs/detection
 ```
 
-Dataset paths can be changed through the MMClassification configuration
+Dataset paths can be changed through the MMCLASsification configuration
 override mechanism. No private dataset or checkpoint is distributed here.
 
 ## Attribution
 
-The implementation builds on DeRy, MMClassification, torchvision, timm, and
+The implementation builds on DeRy, MMCLASsification, torchvision, timm, and
 pymoo. The vendored legacy `third_package/timm` tree is retained because the
 heterogeneous block loader relies on its model definitions. See
 `docs/THIRD_PARTY.md` before redistribution.

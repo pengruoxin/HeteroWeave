@@ -5,8 +5,8 @@ searches local refinements under the same resource budget. A candidate can:
 
 1. keep or replace a small number of original backbone blocks;
 2. add local branch blocks with sum/gate fusion;
-3. optimize three objectives: maximize a zero-cost proxy, minimize model
-   size, minimize FLOPs.
+3. optimize three objectives: maximize proxy-estimated performance, minimize
+   parameter count, and minimize FLOPs.
 
 The original GA/EA scripts are not modified. This is a conservative joint
 search route for debugging and later short-training validation.
@@ -46,10 +46,10 @@ METHOD_NOTE = (
     'We initialize the evolutionary search from the original DeRy architecture '
     'and perform constrained multi-objective refinement. Each candidate is a '
     'local perturbation of the original backbone, optionally augmented with '
-    'local branches. The objectives are to maximize a zero-cost proxy '
-    '(NASWOT or ZiCo), minimize model size, and minimize FLOPs. Optionally, '
-    'ZiCo can be combined with the TE-NAS NTK condition-number trainability '
-    'proxy to reduce the risk of selecting high-ZiCo but hard-to-train models.'
+    'local branches. The objectives are to maximize proxy-estimated '
+    'performance, minimize parameter count, and minimize FLOPs. CLAS is the '
+    'canonical HeteroWeave proxy; alternative proxies are retained only for '
+    'ablation and diagnostic runs.'
 )
 
 
@@ -76,13 +76,13 @@ def parse_args():
         '--proxy',
         choices=[
             'naswot', 'zico', 'raw_swap', 'layer_swap_sum',
-            'layer_swap_sqrt'],
-        default='layer_swap_sqrt',
+            'CLAS'],
+        default='CLAS',
         help=(
-            'Zero-cost proxy used as the first objective. raw_swap counts '
-            'global activation patterns; layer_swap_sum sums per-layer '
-            'pattern counts; layer_swap_sqrt applies sqrt to each layer '
-            'before summation.'))
+            'Training-free proxy used as the first objective. raw_swap counts '
+            'global activation patterns; layer_swap_sum sums per-position '
+            'pattern counts; CLAS applies square-root aggregation to each '
+            'position before summation.'))
     parser.add_argument(
         '--proxy-data-seed', type=int, default=11,
         help='Seed used once to cache the same ImageNet proxy batches.')
@@ -93,7 +93,7 @@ def parse_args():
         '--swap-image-count', type=int, default=32,
         help='Number of cached images used by SWAP-family proxies.')
     parser.add_argument(
-        '--quality-proxy-mode',
+        '--performance-proxy-mode',
         choices=['raw', 'zico_ntk'],
         default='raw',
         help=(
@@ -103,7 +103,7 @@ def parse_args():
         '--ntk-weight',
         type=float,
         default=0.2,
-        help='Weight for log(NTK condition) in --quality-proxy-mode zico_ntk.')
+        help='Weight for log(NTK condition) in --performance-proxy-mode zico_ntk.')
     parser.add_argument(
         '--ntk-max-samples',
         type=int,
@@ -129,12 +129,12 @@ def parse_args():
             'Optional hard trainability/stability gate applied before NSGA-III '
             'selection. Candidates with empirical NTK condition above this '
             'threshold are marked infeasible. Requires '
-            '--quality-proxy-mode zico_ntk.'))
+            '--performance-proxy-mode zico_ntk.'))
     parser.add_argument(
         '--ntk-train-mode',
         action='store_true',
         help='Use model.train() for NTK. Default keeps TE-NAS code default train_mode=False.')
-    parser.add_argument('--objectives', default='proxy,size,flops')
+    parser.add_argument('--objectives', default='performance,parameters,flops')
     parser.add_argument('--ref-partitions', type=int, default=4)
     parser.add_argument('--top-k', type=int, default=None)
     parser.add_argument(
@@ -186,12 +186,12 @@ def parse_args():
             'The optimized proxy becomes proxy - penalty * num_backbone_replacements. '
             'Default 0 keeps the old raw-proxy behavior.'))
     parser.add_argument(
-        '--size-proxy-penalty',
+        '--parameter-proxy-penalty',
         type=float,
         default=0.0,
         help=(
             'Penalty per 1M parameters applied to the first objective. '
-            'Useful for correcting ZiCo size bias. Default 0.'))
+            'Useful for correcting ZiCo parameter-count bias. Default 0.'))
     parser.add_argument(
         '--flops-proxy-penalty',
         type=float,
@@ -279,7 +279,12 @@ def import_real_search_deps():
     return torch, ZeroNas, ea
 
 
-SWAP_PROXIES = {'raw_swap', 'layer_swap_sum', 'layer_swap_sqrt'}
+SWAP_PROXIES = {'raw_swap', 'layer_swap_sum', 'CLAS'}
+
+
+def proxy_score_key(proxy_name):
+    """Map the paper-facing proxy name to the internal score key."""
+    return 'layer_swap_sqrt' if proxy_name == 'CLAS' else proxy_name
 
 
 def clone_proxy_batch(data):
@@ -579,7 +584,7 @@ def make_context(args):
     ntk_batches = (
         [(batch['img'], batch.get('gt_label')) for batch in cached_batches[
             :args.ntk_num_batch]]
-        if args.quality_proxy_mode == 'zico_ntk'
+        if args.performance_proxy_mode == 'zico_ntk'
         else [])
     indicator = ZeroNas(
         dataloader=cached_batches,
@@ -846,20 +851,20 @@ def objective_proxy_label(args):
 
 
 def base_objective_proxy_label(args):
-    if args.quality_proxy_mode == 'zico_ntk':
-        return 'quality_zico_ntk'
+    if args.performance_proxy_mode == 'zico_ntk':
+        return 'performance_zico_ntk'
     return args.proxy
 
 
 def has_proxy_penalty(args):
     return (
         args.anchor_proxy_penalty > 0 or
-        args.size_proxy_penalty > 0 or
+        args.parameter_proxy_penalty > 0 or
         args.flops_proxy_penalty > 0)
 
 
 def uses_nonraw_objective(args):
-    return args.quality_proxy_mode != 'raw' or has_proxy_penalty(args)
+    return args.performance_proxy_mode != 'raw' or has_proxy_penalty(args)
 
 
 def individual_key(x):
@@ -887,14 +892,14 @@ def evaluate_refined_candidate(
         context['indicator'],
         args,
         memo={})
-    proxy_score = item.get(args.proxy)
+    proxy_score = item.get(proxy_score_key(args.proxy))
     swap_scores = dict(
         raw_swap=None, layer_swap_sum=None, layer_swap_sqrt=None)
     proxy_error = None
     if item.get('error') is None and args.proxy in SWAP_PROXIES:
         try:
             swap_scores = compute_swap_scores(eval_cfg, context, args)
-            proxy_score = swap_scores[args.proxy]
+            proxy_score = swap_scores[proxy_score_key(args.proxy)]
         except Exception as exc:
             proxy_error = f'swap_{type(exc).__name__}: {exc}'
     num_backbone_replacements = sum(
@@ -913,43 +918,43 @@ def evaluate_refined_candidate(
         zico = float(zico) if zico is not None else None
         ntk_condition = None
         ntk_trainability_score = None
-        quality_proxy_score = proxy_score
-        quality_error = None
-        if args.quality_proxy_mode == 'zico_ntk':
+        performance_proxy_score = proxy_score
+        performance_error = None
+        if args.performance_proxy_mode == 'zico_ntk':
             try:
                 ntk_condition = compute_tenas_ntk_condition(
                     eval_cfg, context, args)
                 ntk_trainability_score = -math.log(
                     max(float(ntk_condition), float(args.ntk_eps)))
-                quality_proxy_score = (
+                performance_proxy_score = (
                     math.log(max(float(zico), float(args.ntk_eps))) +
                     args.ntk_weight * ntk_trainability_score)
                 if (args.max_ntk_condition is not None and
                         ntk_condition > args.max_ntk_condition):
-                    quality_error = (
+                    performance_error = (
                         'ntk_stability_gate: condition='
                         f'{ntk_condition:.9g} > max='
                         f'{args.max_ntk_condition:.9g}')
             except Exception as exc:
-                quality_error = f'ntk_{type(exc).__name__}: {exc}'
+                performance_error = f'ntk_{type(exc).__name__}: {exc}'
 
-        if quality_error is not None:
+        if performance_error is not None:
             objectives = [1e9, 1e9, 1e9]
-            error = quality_error
+            error = performance_error
             adjusted_proxy_score = -1e9
             objective_proxy_score = -1e9
             replacement_proxy_penalty = 0.0
-            size_proxy_penalty = 0.0
+            parameter_proxy_penalty = 0.0
             flops_proxy_penalty = 0.0
             complexity_proxy_penalty = 0.0
         else:
             replacement_proxy_penalty = (
                 args.anchor_proxy_penalty * float(num_backbone_replacements))
-            size_proxy_penalty = args.size_proxy_penalty * size
+            parameter_proxy_penalty = args.parameter_proxy_penalty * size
             flops_proxy_penalty = args.flops_proxy_penalty * flops
-            complexity_proxy_penalty = size_proxy_penalty + flops_proxy_penalty
+            complexity_proxy_penalty = parameter_proxy_penalty + flops_proxy_penalty
             adjusted_proxy_score = (
-                quality_proxy_score -
+                performance_proxy_score -
                 replacement_proxy_penalty -
                 complexity_proxy_penalty)
             objective_proxy_score = adjusted_proxy_score
@@ -961,11 +966,11 @@ def evaluate_refined_candidate(
         proxy_score = -1e9
         adjusted_proxy_score = -1e9
         objective_proxy_score = -1e9
-        quality_proxy_score = -1e9
+        performance_proxy_score = -1e9
         ntk_condition = None
         ntk_trainability_score = None
         replacement_proxy_penalty = 0.0
-        size_proxy_penalty = 0.0
+        parameter_proxy_penalty = 0.0
         flops_proxy_penalty = 0.0
         complexity_proxy_penalty = 0.0
         naswot = item.get('naswot')
@@ -984,8 +989,8 @@ def evaluate_refined_candidate(
         proxy=args.proxy,
         proxy_score=proxy_score,
         raw_proxy_score=proxy_score,
-        quality_proxy_mode=args.quality_proxy_mode,
-        quality_proxy_score=quality_proxy_score,
+        performance_proxy_mode=args.performance_proxy_mode,
+        performance_proxy_score=performance_proxy_score,
         ntk_condition=ntk_condition,
         ntk_trainability_score=ntk_trainability_score,
         ntk_weight=float(args.ntk_weight),
@@ -993,7 +998,7 @@ def evaluate_refined_candidate(
         objective_proxy_score=objective_proxy_score,
         anchor_proxy_penalty=float(args.anchor_proxy_penalty),
         replacement_proxy_penalty=replacement_proxy_penalty,
-        size_proxy_penalty=size_proxy_penalty,
+        parameter_proxy_penalty=parameter_proxy_penalty,
         flops_proxy_penalty=flops_proxy_penalty,
         complexity_proxy_penalty=complexity_proxy_penalty,
         naswot=naswot,
@@ -1115,7 +1120,7 @@ def select_refine_representatives(front, args):
         normalized(flops, higher_better=False))
     reps = {
         f'top_{objective_proxy_label(args)}': int(np.argmax(objective_proxy)),
-        'min_size': int(np.argmin(size)),
+        'min_parameters': int(np.argmin(size)),
         'min_flops': int(np.argmin(flops)),
         'knee': int(np.argmax(balanced)),
     }
@@ -1131,14 +1136,14 @@ def save_csv(front, reps, output_dir, args):
     raw_top_field = f'is_top_raw_{args.proxy}' if uses_nonraw_objective(args) else None
     fields = [
         'rank', 'id', 'proxy', 'proxy_score', 'raw_proxy_score',
-        'quality_proxy_mode', 'quality_proxy_score', 'ntk_condition',
+        'performance_proxy_mode', 'performance_proxy_score', 'ntk_condition',
         'ntk_trainability_score', 'ntk_weight',
         'adjusted_proxy_score', 'objective_proxy_score', 'anchor_proxy_penalty',
-        'replacement_proxy_penalty', 'size_proxy_penalty',
+        'replacement_proxy_penalty', 'parameter_proxy_penalty',
         'flops_proxy_penalty', 'complexity_proxy_penalty',
         'naswot', 'zico', 'raw_swap', 'layer_swap_sum',
-        'layer_swap_sqrt', 'size', 'flops',
-        f'objective_1_neg_{proxy_name}', 'objective_2_size', 'objective_3_flops',
+        'CLAS', 'parameters', 'flops',
+        f'objective_1_neg_{proxy_name}', 'objective_2_parameters', 'objective_3_flops',
         'config_path', 'backbone_delta_summary', 'branch_summary',
         'operator_summary', 'num_backbone_replacements', 'num_branch_layers',
         'structure_type', 'structure_group', 'source',
@@ -1146,8 +1151,8 @@ def save_csv(front, reps, output_dir, args):
     ]
     if raw_top_field is not None:
         fields.append(raw_top_field)
-    fields.extend(['is_min_size', 'is_min_flops', 'is_knee', 'error'])
-    rep_labels = [f'top_{proxy_name}', 'min_size', 'min_flops', 'knee']
+    fields.extend(['is_min_parameters', 'is_min_flops', 'is_knee', 'error'])
+    rep_labels = [f'top_{proxy_name}', 'min_parameters', 'min_flops', 'knee']
     if raw_top_field is not None:
         rep_labels.append(f'top_raw_{args.proxy}')
     rep_indices = {
@@ -1164,8 +1169,8 @@ def save_csv(front, reps, output_dir, args):
                 proxy=item.get('proxy', args.proxy),
                 proxy_score=item['proxy_score'],
                 raw_proxy_score=item.get('raw_proxy_score', item['proxy_score']),
-                quality_proxy_mode=item.get('quality_proxy_mode', 'raw'),
-                quality_proxy_score=item.get('quality_proxy_score'),
+                performance_proxy_mode=item.get('performance_proxy_mode', 'raw'),
+                performance_proxy_score=item.get('performance_proxy_score'),
                 ntk_condition=item.get('ntk_condition'),
                 ntk_trainability_score=item.get('ntk_trainability_score'),
                 ntk_weight=item.get('ntk_weight'),
@@ -1173,18 +1178,18 @@ def save_csv(front, reps, output_dir, args):
                 objective_proxy_score=item.get('objective_proxy_score', item['proxy_score']),
                 anchor_proxy_penalty=item.get('anchor_proxy_penalty', 0.0),
                 replacement_proxy_penalty=item.get('replacement_proxy_penalty', 0.0),
-                size_proxy_penalty=item.get('size_proxy_penalty', 0.0),
+                parameter_proxy_penalty=item.get('parameter_proxy_penalty', 0.0),
                 flops_proxy_penalty=item.get('flops_proxy_penalty', 0.0),
                 complexity_proxy_penalty=item.get('complexity_proxy_penalty', 0.0),
                 naswot=item.get('naswot'),
                 zico=item['zico'],
                 raw_swap=item.get('raw_swap'),
                 layer_swap_sum=item.get('layer_swap_sum'),
-                layer_swap_sqrt=item.get('layer_swap_sqrt'),
-                size=item['size'],
+                CLAS=item.get('layer_swap_sqrt'),
+                parameters=item['size'],
                 flops=item['flops'],
                 **{f'objective_1_neg_{proxy_name}': item['objectives'][0]},
-                objective_2_size=item['objectives'][1],
+                objective_2_parameters=item['objectives'][1],
                 objective_3_flops=item['objectives'][2],
                 config_path=item.get('config_path'),
                 backbone_delta_summary=item.get('backbone_delta_summary', ''),
@@ -1198,7 +1203,7 @@ def save_csv(front, reps, output_dir, args):
                 is_pareto_front=item.get('is_pareto_front', True),
                 selection_reason=item.get('selection_reason', 'pareto'),
                 **{top_field: rank in rep_indices[f'top_{proxy_name}']},
-                is_min_size=rank in rep_indices['min_size'],
+                is_min_parameters=rank in rep_indices['min_parameters'],
                 is_min_flops=rank in rep_indices['min_flops'],
                 is_knee=rank in rep_indices['knee'],
                 error=item.get('error'))
@@ -1266,7 +1271,7 @@ def select_refine_front(records, top_k, structure_min_quota):
             item['selection_reason'] = f'structure_quota:{group}'
             selected.append(item)
             selected_ids.add(item['id'])
-    for source, reason in ((front, 'pareto'), (valid, 'top_quality_fill')):
+    for source, reason in ((front, 'pareto'), (valid, 'top_performance_fill')):
         for item in source:
             if item['id'] in selected_ids:
                 continue
@@ -1297,12 +1302,12 @@ def write_search_log(output_dir, args, ref_dirs, generation_logs, records):
         file.write(f'proxy_data_seed: {args.proxy_data_seed}\n')
         file.write(f'proxy_model_seed: {args.proxy_model_seed}\n')
         file.write(f'swap_image_count: {args.swap_image_count}\n')
-        file.write(f'quality_proxy_mode: {args.quality_proxy_mode}\n')
+        file.write(f'performance_proxy_mode: {args.performance_proxy_mode}\n')
         file.write(f'objective_proxy: {proxy_name}\n')
-        file.write(f'objectives: minimize [-{proxy_name}, size, flops]\n')
-        if args.quality_proxy_mode == 'zico_ntk':
+        file.write(f'objectives: minimize [-{proxy_name}, parameters, FLOPs]\n')
+        if args.performance_proxy_mode == 'zico_ntk':
             file.write(
-                'quality_proxy_formula: log(zico) - '
+                'performance_proxy_formula: log(zico) - '
                 f'{args.ntk_weight} * log(ntk_condition)\n')
             file.write('ntk_condition_formula: lambda_max(NTK) / lambda_min(NTK)\n')
             file.write(f'ntk_max_samples: {args.ntk_max_samples}\n')
@@ -1315,7 +1320,7 @@ def write_search_log(output_dir, args, ref_dirs, generation_logs, records):
             file.write(
                 f'{proxy_name} = {base_objective_proxy_label(args)} - '
                 f'{args.anchor_proxy_penalty} * num_backbone_replacements - '
-                f'{args.size_proxy_penalty} * size_M - '
+                f'{args.parameter_proxy_penalty} * parameters_M - '
                 f'{args.flops_proxy_penalty} * flops_G\n')
         file.write(f'min_params: {args.min_params}\n')
         file.write(f'max_params: {args.max_params}\n')
@@ -1359,8 +1364,8 @@ def write_search_log(output_dir, args, ref_dirs, generation_logs, records):
             file.write(
                 f"stage={row.get('stage', 'joint')} "
                 f"generation={row['generation']} valid={row['valid']} "
-                f"pareto={row['pareto']} best_{proxy_name}={row['best_zico']:.6f} "
-                f"min_size={row['min_size']:.6f} min_flops={row['min_flops']:.6f} "
+                f"pareto={row['pareto']} best_{proxy_name}={row['best_performance']:.6f} "
+                f"min_parameters={row['min_parameters']:.6f} min_flops={row['min_flops']:.6f} "
                 f"failed={row['failed']}\n")
         file.write('\nfailure_summary:\n')
         if failures:
@@ -1374,24 +1379,18 @@ def write_search_log(output_dir, args, ref_dirs, generation_logs, records):
 def main():
     args = parse_args()
     objectives = [name.strip() for name in args.objectives.split(',') if name.strip()]
-    valid_objectives = [
-        ['proxy', 'size', 'flops'],
-        [args.proxy, 'size', 'flops'],
-    ]
-    if objectives not in valid_objectives:
-        raise SystemExit(
-            'This refine version supports --objectives proxy,size,flops '
-            f'or --objectives {args.proxy},size,flops only.')
-    if args.quality_proxy_mode == 'zico_ntk' and args.proxy != 'zico':
-        raise SystemExit('--quality-proxy-mode zico_ntk requires --proxy zico.')
+    if objectives != ['performance', 'parameters', 'flops']:
+        raise SystemExit('Use --objectives performance,parameters,flops.')
+    if args.performance_proxy_mode == 'zico_ntk' and args.proxy != 'zico':
+        raise SystemExit('--performance-proxy-mode zico_ntk requires --proxy zico.')
     if (args.max_ntk_condition is not None and
-            args.quality_proxy_mode != 'zico_ntk'):
+            args.performance_proxy_mode != 'zico_ntk'):
         raise SystemExit(
-            '--max-ntk-condition requires --quality-proxy-mode zico_ntk.')
+            '--max-ntk-condition requires --performance-proxy-mode zico_ntk.')
     if args.max_ntk_condition is not None and args.max_ntk_condition <= 0:
         raise SystemExit('--max-ntk-condition must be positive.')
     args.anchor_proxy_penalty = max(0.0, args.anchor_proxy_penalty)
-    args.size_proxy_penalty = max(0.0, args.size_proxy_penalty)
+    args.parameter_proxy_penalty = max(0.0, args.parameter_proxy_penalty)
     args.flops_proxy_penalty = max(0.0, args.flops_proxy_penalty)
     args.ntk_weight = max(0.0, args.ntk_weight)
     args.ntk_max_samples = max(2, int(args.ntk_max_samples))

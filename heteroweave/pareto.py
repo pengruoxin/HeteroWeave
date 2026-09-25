@@ -6,9 +6,9 @@ from typing import Iterable, Sequence
 
 
 def dominates(left: Sequence[float], right: Sequence[float]) -> bool:
-    """Return whether left dominates right for [quality, params, FLOPs]."""
+    """Return whether left dominates right for [performance, params, FLOPs]."""
     if len(left) != 3 or len(right) != 3:
-        raise ValueError("points must contain quality, parameters, and FLOPs")
+        raise ValueError("points must contain performance, parameters, and FLOPs")
     no_worse = left[0] >= right[0] and left[1] <= right[1] and left[2] <= right[2]
     strictly_better = left[0] > right[0] or left[1] < right[1] or left[2] < right[2]
     return bool(no_worse and strictly_better)

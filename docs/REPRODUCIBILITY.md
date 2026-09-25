@@ -8,26 +8,30 @@ paper. Datasets and pretrained weights are obtained from their public sources.
 
 ## Determinism
 
-Record Python, NumPy, and PyTorch seeds for every run. Clas comparisons must
+Record Python, NumPy, and PyTorch seeds for every run. CLAS comparisons must
 use the same image panel, preprocessing, initialization boundary, and evaluated
 positions for all candidates. Full-training comparisons should report all
 seeds used rather than selecting the best seed.
 
 ## Search protocol
 
+The paper-level objectives are trained performance, parameter count, and FLOPs.
+During search, CLAS replaces the unavailable trained-performance objective as a
+training-free proxy; parameter count and FLOPs remain directly computed.
+
 1. Build the candidate component inventory and record every checkpoint source.
 2. Encode a nonempty selection at every aligned position, within its maximum
    cardinality.
-3. Evaluate Clas on one fixed image panel.
+3. Evaluate CLAS on one fixed image panel.
 4. count parameters and FLOPs using the same input resolution and accounting
    boundary;
-5. optimize `[maximize Clas, minimize parameters, minimize FLOPs]`;
+5. optimize the search surrogate `[maximize CLAS, minimize parameters, minimize FLOPs]`;
 6. compute the strict nondominated set before choosing operating points;
 7. train only representatives selected by the declared rule.
 
 The canonical protocol is recorded in
-`configs/search/imagenet_canonical.yaml`. Search scripts preserve the
-historical option name `layer_swap_sqrt` for Clas. Position 0 admits one
+`configs/search/imagenet_canonical.yaml`. Search scripts expose the paper-facing proxy name **CLAS**.
+Position 0 admits one
 component; positions 1--3 admit one or two components. The fusion operator is
 not searched: all multi-branch candidates use fixed, parameter-free arithmetic
 mean fusion during architecture search (`operator='sum'` in the historical

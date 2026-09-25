@@ -152,7 +152,7 @@ ACTIVATION_TYPES = (
 
 
 class PositionLayerSwapCollector:
-    """Layer-SWAP Sqrt over fused outputs at the registered search positions.
+    """CLAS over fused outputs at the registered search positions.
 
     Each hook observes the output *after* all same-position collaborators have
     been fused.  Pattern counts are computed independently per position, then
@@ -202,7 +202,7 @@ class PositionLayerSwapCollector:
                 f"Missing position outputs: {sorted(set(self.patterns) - set(result))}")
         result["position_sqrt"] = {
             name: math.sqrt(value) for name, value in result.items()}
-        result["layer_swap_sqrt"] = float(sum(result["position_sqrt"].values()))
+        result["CLAS"] = float(sum(result["position_sqrt"].values()))
         result["selected_position_count"] = len(self.patterns)
         return result
 
@@ -343,13 +343,13 @@ def score(args):
         model = build_model(anchor_state, component_states, candidate, args.model_seed).to(device)
         panel_scores = [dense_swap(model, loader, device) for loader in loaders]
         macs, flops = count_compute(model, device, args.size)
-        values = [item["layer_swap_sqrt"] for item in panel_scores]
+        values = [item["CLAS"] for item in panel_scores]
         row = dict(candidate)
         row.update(
             components=json.dumps(candidate["components"]),
             panel_scores=json.dumps(values),
-            layer_swap_sqrt_mean=float(np.mean(values)),
-            layer_swap_sqrt_panel_std=float(np.std(values)),
+            CLAS_mean=float(np.mean(values)),
+            CLAS_panel_std=float(np.std(values)),
             params=sum(parameter.numel() for parameter in model.parameters()),
             trainable_params=sum(parameter.numel() for parameter in model.parameters()
                                  if parameter.requires_grad),

@@ -1,15 +1,12 @@
-"""NSGA-III three-objective local-branch search for DeRy.
+"""NSGA-III three-objective local-branch search for HeteroWeave.
 
-We extend the original single-objective genetic search into a three-objective
-optimization problem. The objectives are to maximize the ZICO proxy score,
-minimize the model size, and minimize FLOPs. NSGA-III is adopted to obtain a
-diverse Pareto front under these conflicting objectives. Representative
-architectures, including the highest-ZICO model, the minimum-size model, the
-minimum-FLOPs model, and the balanced knee solution, are selected for training
-and empirical validation.
+The search optimizes a training-free performance proxy, parameter count, and
+FLOPs. CLAS is the canonical HeteroWeave performance proxy. NSGA-III retains a
+diverse Pareto front under these conflicting objectives, from which operating
+points can be selected for full training and empirical validation.
 
-The NSGA-III optimizer minimizes objectives, so the real objective vector is:
-[-zico, size, flops].
+The NSGA-III optimizer minimizes objectives, so the objective vector is
+[-performance_proxy, parameters, FLOPs].
 """
 
 import argparse
@@ -33,13 +30,10 @@ for path in [REPO_ROOT, SIM_DIR, os.path.join(REPO_ROOT, 'third_package')]:
 
 
 METHOD_NOTE = (
-    'We extend the original single-objective genetic search into a '
-    'three-objective optimization problem. The objectives are to maximize the '
-    'ZICO proxy score, minimize the model size, and minimize FLOPs. NSGA-III '
-    'is adopted to obtain a diverse Pareto front under these conflicting '
-    'objectives. Representative architectures, including the highest-ZICO '
-    'model, the minimum-size model, the minimum-FLOPs model, and the balanced '
-    'knee solution, are selected for training and empirical validation.'
+    'HeteroWeave performs three-objective search over a training-free '
+    'performance proxy, parameter count, and FLOPs. CLAS is the canonical '
+    'performance proxy. NSGA-III retains the non-dominated trade-off set for '
+    'subsequent operating-point selection and full training.'
 )
 
 
@@ -74,7 +68,7 @@ def import_pymoo():
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description='NSGA-III multi-objective search: maximize ZiCo, minimize size and FLOPs.')
+        description='NSGA-III search: maximize a performance proxy, minimize parameters and FLOPs.')
     parser.add_argument(
         'backbone_config',
         nargs='?',
@@ -90,21 +84,21 @@ def parse_args():
     parser.add_argument('--population-size', '--pop-size', dest='population_size', type=int, default=96)
     parser.add_argument('--generations', type=int, default=120)
     parser.add_argument('--seed', type=int, default=0)
-    parser.add_argument('--output-dir', default='simlarity/out/nsga3_zico_size_flops')
-    parser.add_argument('--objectives', default='zico,size,flops')
+    parser.add_argument('--output-dir', default='simlarity/out/nsga3_performance_params_flops')
+    parser.add_argument('--objectives', default='performance,parameters,flops')
     parser.add_argument(
-        '--quality-mode',
+        '--performance-mode',
         choices=[
             'zico', 'zico_expr', 'old_zico_ntk', 'zico_expr_ntk',
-            'raw_swap', 'layer_swap_sum', 'layer_swap_sqrt',
+            'raw_swap', 'layer_swap_sum', 'CLAS',
             'zico_norm_mean', 'zico_norm_top', 'zico_norm_clip',
             'zico_norm_balanced',
             'zico_norm_mean_expr', 'zico_norm_top_expr',
             'zico_norm_clip_expr', 'zico_norm_balanced_expr',
             'robust_zico', 'robust_zico_expr'],
-        default='layer_swap_sqrt',
+        default='CLAS',
         help=(
-            'First objective quality. zico keeps legacy behavior. zico_expr '
+            'Training-free performance proxy used for the first objective. CLAS is the canonical HeteroWeave proxy. zico keeps legacy behavior. zico_expr '
             'uses log(ZiCo)+log(expressivity). old_zico_ntk uses '
             'log(ZiCo)-0.5*log(NTK condition). zico_expr_ntk also subtracts '
             '--ntk-penalty*log(NTK condition). zico_norm_* uses '
@@ -130,7 +124,7 @@ def parse_args():
         help=(
             'Minimum retained final candidates for each available gate-only, '
             'sum-only, and mixed branch family. This changes selection only, '
-            'never the quality score.'))
+            'never the performance score.'))
     parser.add_argument('--toy', action='store_true', help='Run with random toy objectives, no DeRy imports.')
     parser.add_argument('--toy-branches', type=int, default=4)
     parser.add_argument('--minC', dest='min_params', type=float, default=None)
@@ -239,20 +233,20 @@ def candidate_structure_group(candidate):
 def select_representatives(front):
     if not front:
         return {}
-    quality = np.asarray(
-        [item.get('quality', item.get('zico', -1e9)) for item in front],
+    performance = np.asarray(
+        [item.get('performance', item.get('zico', -1e9)) for item in front],
         dtype=float)
     zico = np.asarray([item['zico'] for item in front], dtype=float)
     size = np.asarray([item['size'] for item in front], dtype=float)
     flops = np.asarray([item['flops'] for item in front], dtype=float)
     balanced = (
-        normalized(quality, higher_better=True) +
+        normalized(performance, higher_better=True) +
         normalized(size, higher_better=False) +
         normalized(flops, higher_better=False))
     return dict(
-        top_quality=int(np.argmax(quality)),
+        top_performance=int(np.argmax(performance)),
         top_zico=int(np.argmax(zico)),
-        min_size=int(np.argmin(size)),
+        min_parameters=int(np.argmin(size)),
         min_flops=int(np.argmin(flops)),
         knee=int(np.argmax(balanced)),
     )
@@ -268,7 +262,7 @@ def write_text_config(path, text):
 def save_placeholder_config(path, record):
     text = (
         '# Toy NSGA-III placeholder config.\n'
-        f'# zico={record["zico"]:.6f}, size={record["size"]:.6f}, '
+        f'# performance_proxy={record.get("performance", record["zico"]):.6f}, parameters={record["size"]:.6f}, '
         f'flops={record["flops"]:.6f}\n'
         f'individual = {record["individual"]!r}\n')
     write_text_config(path, text)
@@ -299,24 +293,24 @@ def export_configs(front, reps, config_dir, build_config_fn=None):
 def save_csv(front, reps, output_dir):
     path = os.path.join(output_dir, 'pareto_front.csv')
     fields = [
-        'rank', 'id', 'quality_mode', 'quality', 'zico',
-        'raw_swap', 'layer_swap_sum', 'layer_swap_sqrt',
+        'rank', 'id', 'performance_mode', 'performance', 'zico',
+        'raw_swap', 'layer_swap_sum', 'CLAS',
         'normalized_zico_mean', 'normalized_zico_top',
         'normalized_zico_clip', 'normalized_zico_balanced',
         'normalized_zico_mean_dispersion', 'normalized_zico_top_dispersion',
         'normalized_zico_clip_dispersion',
-        'expressivity', 'progressivity', 'ntk_condition', 'size', 'flops',
-        'objective_1_neg_quality', 'objective_1_neg_zico',
-        'objective_2_size', 'objective_3_flops',
+        'expressivity', 'progressivity', 'ntk_condition', 'parameters', 'flops',
+        'objective_1_neg_performance',
+        'objective_2_parameters', 'objective_3_flops',
         'config_path', 'block_list_summary', 'branch_summary', 'operator_summary',
         'structure_group',
         'is_pareto_front', 'selection_reason',
-        'is_top_quality', 'is_top_zico', 'is_min_size', 'is_min_flops',
+        'is_top_performance', 'is_top_zico', 'is_min_parameters', 'is_min_flops',
         'is_knee', 'error',
     ]
     rep_indices = {
         label: {idx for name, idx in reps.items() if name == label}
-        for label in ('top_quality', 'top_zico', 'min_size', 'min_flops', 'knee')
+        for label in ('top_performance', 'top_zico', 'min_parameters', 'min_flops', 'knee')
     }
     with open(path, 'w', encoding='utf-8', newline='') as file:
         writer = csv.DictWriter(file, fieldnames=fields)
@@ -325,12 +319,12 @@ def save_csv(front, reps, output_dir):
             writer.writerow(dict(
                 rank=rank,
                 id=item['id'],
-                quality_mode=item.get('quality_mode', 'zico'),
-                quality=item.get('quality', item.get('zico')),
+                performance_mode=item.get('performance_mode', 'CLAS'),
+                performance=item.get('performance', item.get('zico')),
                 zico=item['zico'],
                 raw_swap=item.get('raw_swap', ''),
                 layer_swap_sum=item.get('layer_swap_sum', ''),
-                layer_swap_sqrt=item.get('layer_swap_sqrt', ''),
+                CLAS=item.get('layer_swap_sqrt', ''),
                 normalized_zico_mean=item.get('normalized_zico_mean', ''),
                 normalized_zico_top=item.get('normalized_zico_top', ''),
                 normalized_zico_clip=item.get('normalized_zico_clip', ''),
@@ -345,11 +339,10 @@ def save_csv(front, reps, output_dir):
                 expressivity=item.get('expressivity', ''),
                 progressivity=item.get('progressivity', ''),
                 ntk_condition=item.get('ntk_condition', ''),
-                size=item['size'],
+                parameters=item['size'],
                 flops=item['flops'],
-                objective_1_neg_quality=item['objectives'][0],
-                objective_1_neg_zico=item['objectives'][0],
-                objective_2_size=item['objectives'][1],
+                objective_1_neg_performance=item['objectives'][0],
+                objective_2_parameters=item['objectives'][1],
                 objective_3_flops=item['objectives'][2],
                 config_path=item.get('config_path'),
                 block_list_summary=item.get('block_list_summary', ''),
@@ -358,9 +351,9 @@ def save_csv(front, reps, output_dir):
                 structure_group=item.get('structure_group', ''),
                 is_pareto_front=item.get('is_pareto_front', True),
                 selection_reason=item.get('selection_reason', 'pareto'),
-                is_top_quality=rank in rep_indices['top_quality'],
+                is_top_performance=rank in rep_indices['top_performance'],
                 is_top_zico=rank in rep_indices['top_zico'],
-                is_min_size=rank in rep_indices['min_size'],
+                is_min_parameters=rank in rep_indices['min_parameters'],
                 is_min_flops=rank in rep_indices['min_flops'],
                 is_knee=rank in rep_indices['knee'],
                 error=item.get('error')))
@@ -381,7 +374,7 @@ def write_search_log(output_dir, args, ref_dirs, generation_logs, records):
         file.write(f'generations: {args.generations}\n')
         file.write(f'seed: {args.seed}\n')
         file.write(
-            f'quality_mode: {getattr(args, "quality_mode", "zico")}\n')
+            f'performance_mode: {getattr(args, "performance_mode", "CLAS")}\n')
         file.write(f'proxy_data_seed: {args.proxy_data_seed}\n')
         file.write(f'proxy_model_seed: {args.proxy_model_seed}\n')
         file.write(f'swap_image_count: {args.swap_image_count}\n')
@@ -397,7 +390,7 @@ def write_search_log(output_dir, args, ref_dirs, generation_logs, records):
         file.write(f'structure_min_quota: {args.structure_min_quota}\n')
         file.write(f'unique_evaluations: {len(records)}\n')
         file.write(f'valid_evaluations: {len(finite_records(records))}\n')
-        if str(getattr(args, 'quality_mode', '')) in (
+        if str(getattr(args, 'performance_mode', '')) in (
                 'robust_zico', 'robust_zico_expr'):
             file.write(
                 'robust_zico_formula: log(zico) - '
@@ -411,7 +404,7 @@ def write_search_log(output_dir, args, ref_dirs, generation_logs, records):
                 f'mean_scale={args.robust_zico_mean_dispersion_scale}, '
                 f'top_center={args.robust_zico_top_dispersion_center}, '
                 f'top_scale={args.robust_zico_top_dispersion_scale}\n')
-        file.write('objectives: minimize [-quality, size, flops]\n')
+        file.write('objectives: minimize [-performance_proxy, parameters, FLOPs]\n')
         file.write(f'reference_directions: {len(ref_dirs)}\n')
         file.write(f'ref_partitions: {args.ref_partitions}\n')
         if args.population_size != len(ref_dirs):
@@ -424,8 +417,8 @@ def write_search_log(output_dir, args, ref_dirs, generation_logs, records):
         for row in generation_logs:
             file.write(
                 f"generation={row['generation']} valid={row['valid']} "
-                f"pareto={row['pareto']} best_zico={row['best_zico']:.6f} "
-                f"min_size={row['min_size']:.6f} min_flops={row['min_flops']:.6f} "
+                f"pareto={row['pareto']} best_performance={row['best_performance']:.6f} "
+                f"min_parameters={row['min_parameters']:.6f} min_flops={row['min_flops']:.6f} "
                 f"failed={row['failed']}\n")
         file.write('\nfailure_summary:\n')
         if failures:
@@ -503,7 +496,7 @@ def import_real_search_deps():
     return torch, ZeroNas, ea, block_expressivity, empirical_ntk_condition
 
 
-SWAP_QUALITY_MODES = {'raw_swap', 'layer_swap_sum', 'layer_swap_sqrt'}
+SWAP_PERFORMANCE_MODES = {'raw_swap', 'layer_swap_sum', 'CLAS'}
 
 
 def clone_proxy_batch(data):
@@ -576,9 +569,9 @@ def make_real_context(args):
     torch.cuda.manual_seed_all(args.seed)
 
     args.score_mode = (
-        'swap' if args.quality_mode in SWAP_QUALITY_MODES else 'zico')
+        'swap' if args.performance_mode in SWAP_PERFORMANCE_MODES else 'zico')
     args.naswot_weight = 0.0
-    args.zico_weight = 0.0 if args.quality_mode in SWAP_QUALITY_MODES else 1.0
+    args.zico_weight = 0.0 if args.performance_mode in SWAP_PERFORMANCE_MODES else 1.0
     args.adapter_burden_weight = 0.0
     args.real_weight = 0.0
     args.real_metric = 'neg_loss'
@@ -658,9 +651,9 @@ def forward_logits_for_classifier(model, images):
     return model.head.fc(features)
 
 
-def compute_quality_extras(candidate, context, args):
-    if args.quality_mode in (
-            'zico', 'raw_swap', 'layer_swap_sum', 'layer_swap_sqrt',
+def compute_performance_extras(candidate, context, args):
+    if args.performance_mode in (
+            'zico', 'raw_swap', 'layer_swap_sum', 'CLAS',
             'zico_norm_mean', 'zico_norm_top',
             'zico_norm_clip', 'zico_norm_balanced', 'robust_zico'):
         return dict(
@@ -683,7 +676,7 @@ def compute_quality_extras(candidate, context, args):
             model, images[:int(args.expr_batch_size)],
             max_vectors=args.expressivity_max_vectors)
         ntk_condition = float('nan')
-        if args.quality_mode in ('old_zico_ntk', 'zico_expr_ntk'):
+        if args.performance_mode in ('old_zico_ntk', 'zico_expr_ntk'):
             ntk_condition = context['empirical_ntk_condition'](
                 model, images, forward_logits_for_classifier,
                 max_samples=args.ntk_max_samples)
@@ -698,8 +691,11 @@ def compute_quality_extras(candidate, context, args):
         torch.cuda.empty_cache()
 
 
-def quality_score_key(args):
+def performance_score_key(args):
     mapping = {
+        'raw_swap': 'raw_swap',
+        'layer_swap_sum': 'layer_swap_sum',
+        'CLAS': 'layer_swap_sqrt',
         'zico_norm_mean': 'normalized_zico_mean',
         'zico_norm_top': 'normalized_zico_top',
         'zico_norm_clip': 'normalized_zico_clip',
@@ -711,10 +707,10 @@ def quality_score_key(args):
         'robust_zico': 'zico',
         'robust_zico_expr': 'zico',
     }
-    return mapping.get(args.quality_mode, 'zico')
+    return mapping.get(args.performance_mode, 'zico')
 
 
-def robust_zico_quality(raw_zico, item, args):
+def robust_zico_performance(raw_zico, item, args):
     if raw_zico is None or not math.isfinite(float(raw_zico)) or float(raw_zico) <= 0:
         return -1e9
     mean_dispersion = float(item.get(
@@ -737,33 +733,33 @@ def robust_zico_quality(raw_zico, item, args):
         float(args.robust_zico_top_dispersion_weight) * top_z)
 
 
-def proxy_quality(score_value, extras, args, item=None):
+def proxy_performance(score_value, extras, args, item=None):
     if score_value is None or not math.isfinite(float(score_value)):
         return -1e9
     score_value = float(score_value)
-    if args.quality_mode in SWAP_QUALITY_MODES:
+    if args.performance_mode in SWAP_PERFORMANCE_MODES:
         return score_value
-    if args.quality_mode == 'zico':
+    if args.performance_mode == 'zico':
         if score_value <= 0:
             return -1e9
         return float(score_value)
     expr = float(extras.get('expressivity', float('nan')))
     ntk_condition = float(extras.get('ntk_condition', float('nan')))
-    if args.quality_mode == 'zico_expr':
+    if args.performance_mode == 'zico_expr':
         if score_value <= 0:
             return -1e9
         log_zico = math.log(max(score_value, 1e-12))
         if not math.isfinite(expr) or expr <= 0:
             return -1e9
         return log_zico + math.log(max(expr, 1e-12))
-    if args.quality_mode == 'old_zico_ntk':
+    if args.performance_mode == 'old_zico_ntk':
         if score_value <= 0:
             return -1e9
         log_zico = math.log(max(score_value, 1e-12))
         if not math.isfinite(ntk_condition) or ntk_condition <= 0:
             return -1e9
         return log_zico - 0.5 * math.log(ntk_condition)
-    if args.quality_mode == 'zico_expr_ntk':
+    if args.performance_mode == 'zico_expr_ntk':
         if score_value <= 0:
             return -1e9
         log_zico = math.log(max(score_value, 1e-12))
@@ -773,26 +769,26 @@ def proxy_quality(score_value, extras, args, item=None):
         return (
             log_zico + math.log(max(expr, 1e-12)) -
             float(args.ntk_penalty) * math.log(ntk_condition))
-    if args.quality_mode in (
+    if args.performance_mode in (
             'zico_norm_mean', 'zico_norm_top', 'zico_norm_clip',
             'zico_norm_balanced'):
         return score_value
-    if args.quality_mode in (
+    if args.performance_mode in (
             'zico_norm_mean_expr', 'zico_norm_top_expr',
             'zico_norm_clip_expr', 'zico_norm_balanced_expr'):
         if not math.isfinite(expr) or expr <= 0:
             return -1e9
         return score_value + math.log(max(expr, 1e-12))
-    if args.quality_mode == 'robust_zico':
-        return robust_zico_quality(score_value, item or {}, args)
-    if args.quality_mode == 'robust_zico_expr':
+    if args.performance_mode == 'robust_zico':
+        return robust_zico_performance(score_value, item or {}, args)
+    if args.performance_mode == 'robust_zico_expr':
         if not math.isfinite(expr) or expr <= 0:
             return -1e9
-        robust = robust_zico_quality(score_value, item or {}, args)
+        robust = robust_zico_performance(score_value, item or {}, args)
         if not math.isfinite(robust):
             return -1e9
         return robust + math.log(max(expr, 1e-12))
-    raise ValueError(f'Unsupported quality mode: {args.quality_mode}')
+    raise ValueError(f'Unsupported performance mode: {args.performance_mode}')
 
 
 def real_bounds(context, args):
@@ -856,25 +852,25 @@ def make_real_problem(args, context, pymoo_api, records):
                 swap_scores = dict(
                     raw_swap=float('nan'), layer_swap_sum=float('nan'),
                     layer_swap_sqrt=float('nan'))
-                score_key = quality_score_key(args)
+                score_key = performance_score_key(args)
                 score_value = item.get(score_key)
                 swap_error = None
                 if (item.get('error') is None and
-                        args.quality_mode in SWAP_QUALITY_MODES):
+                        args.performance_mode in SWAP_PERFORMANCE_MODES):
                     try:
                         swap_scores = compute_swap_scores(
                             candidate, context, args)
-                        score_value = swap_scores[args.quality_mode]
+                        score_value = swap_scores[performance_score_key(args)]
                     except Exception as exc:
                         swap_error = f'swap_{type(exc).__name__}: {exc}'
                 if (item.get('error') is None and swap_error is None and
                         score_value is not None):
                     try:
-                        extras = compute_quality_extras(candidate, context, args)
-                        quality = proxy_quality(
+                        extras = compute_performance_extras(candidate, context, args)
+                        performance = proxy_performance(
                             score_value, extras, args, item)
                         objectives = [
-                            -float(quality),
+                            -float(performance),
                             float(item['size']),
                             float(item['flops'])]
                         error = None
@@ -904,8 +900,8 @@ def make_real_problem(args, context, pymoo_api, records):
                         flops = float(item['flops'])
                     except Exception as exc:
                         objectives = [1e9, 1e9, 1e9]
-                        error = f'quality_{type(exc).__name__}: {exc}'
-                        quality = -1e9
+                        error = f'performance_{type(exc).__name__}: {exc}'
+                        performance = -1e9
                         zico = float(item.get('zico') or -1e9)
                         normalized_zico_mean = float(item.get(
                             'normalized_zico_mean', float('nan')))
@@ -929,7 +925,7 @@ def make_real_problem(args, context, pymoo_api, records):
                 else:
                     objectives = [1e9, 1e9, 1e9]
                     error = swap_error or item.get('error') or 'invalid'
-                    quality = -1e9
+                    performance = -1e9
                     zico = -1e9
                     normalized_zico_mean = float('nan')
                     normalized_zico_top = float('nan')
@@ -948,8 +944,8 @@ def make_real_problem(args, context, pymoo_api, records):
                     individual=list(raw_key),
                     candidate_signature=repr(key),
                     candidate=candidate,
-                    quality_mode=args.quality_mode,
-                    quality=float(quality),
+                    performance_mode=args.performance_mode,
+                    performance=float(performance),
                     zico=zico,
                     normalized_zico_mean=normalized_zico_mean,
                     normalized_zico_top=normalized_zico_top,
@@ -987,15 +983,15 @@ def make_callback(pymoo_api, generation_logs, records_fn):
             valid_f = pop_f[finite & (pop_f[:, 0] < 1e9)]
             if len(valid_f) > 0:
                 pareto_count = len(non_dominated_objective_indices(valid_f))
-                best_zico = -float(np.min(valid_f[:, 0]))
-                min_size = float(np.min(valid_f[:, 1]))
+                best_performance = -float(np.min(valid_f[:, 0]))
+                min_parameters = float(np.min(valid_f[:, 1]))
                 min_flops = float(np.min(valid_f[:, 2]))
                 valid_count = int(len(valid_f))
                 failed_count = int(len(pop_f) - len(valid_f))
             else:
                 pareto_count = 0
-                best_zico = -float('inf')
-                min_size = float('inf')
+                best_performance = -float('inf')
+                min_parameters = float('inf')
                 min_flops = float('inf')
                 valid_count = 0
                 failed_count = int(len(pop_f))
@@ -1003,8 +999,8 @@ def make_callback(pymoo_api, generation_logs, records_fn):
                 generation=int(algorithm.n_gen),
                 valid=valid_count,
                 pareto=pareto_count,
-                best_zico=float(best_zico),
-                min_size=float(min_size),
+                best_performance=float(best_performance),
+                min_parameters=float(min_parameters),
                 min_flops=float(min_flops),
                 failed=failed_count))
 
@@ -1039,7 +1035,7 @@ def final_front(records):
 
 def rank_key(record):
     return (
-        -float(record.get('quality', record.get('zico', -1e9))),
+        -float(record.get('performance', record.get('zico', -1e9))),
         float(record.get('size', 1e9)),
         float(record.get('flops', 1e9)),
         int(record.get('id', 10 ** 9)))
@@ -1069,7 +1065,7 @@ def selected_front(records, top_k=None, structure_min_quota=0):
             if item['id'] in selected_ids:
                 continue
             item['is_pareto_front'] = item['id'] in pareto_ids
-            item['selection_reason'] = 'top_quality_fill'
+            item['selection_reason'] = 'top_performance_fill'
             front.append(item)
             selected_ids.add(item['id'])
             if len(front) >= limit:
@@ -1099,7 +1095,7 @@ def selected_front(records, top_k=None, structure_min_quota=0):
             selected.append(item)
             selected_ids.add(item['id'])
 
-    for source, reason in ((front, 'pareto'), (valid, 'top_quality_fill')):
+    for source, reason in ((front, 'pareto'), (valid, 'top_performance_fill')):
         for item in source:
             if item['id'] in selected_ids:
                 continue
@@ -1116,8 +1112,8 @@ def main():
     args = parse_args()
     args.swap_image_count = max(2, int(args.swap_image_count))
     objectives = [name.strip() for name in args.objectives.split(',') if name.strip()]
-    if objectives != ['zico', 'size', 'flops']:
-        raise SystemExit('This first NSGA-III version supports --objectives zico,size,flops only.')
+    if objectives != ['performance', 'parameters', 'flops']:
+        raise SystemExit('Use --objectives performance,parameters,flops.')
 
     os.makedirs(args.output_dir, exist_ok=True)
     config_dir = ensure_output_dirs(args.output_dir)

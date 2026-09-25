@@ -318,7 +318,7 @@ def ntk_future_forecast(model, images, labels, args):
     minimum = max(float(eigenvalues[0].item()), 1e-8)
     maximum = max(float(eigenvalues[-1].item()), 1e-8)
     condition = maximum / minimum
-    # log(sigmoid(margin)) is a smooth, bounded classification-quality score.
+    # log(sigmoid(margin)) is a smooth, bounded classification-margin surrogate score.
     score = float(F.logsigmoid(predicted.float()).mean().item())
     return dict(
         score=score,
@@ -385,7 +385,7 @@ def evaluate(path, metadata, batches, args):
         config_path=path,
         source_size=metadata.get('size', ''),
         source_flops=metadata.get('flops', ''),
-        source_proxy_only_quality=metadata.get('proxy_only_quality', ''),
+        source_proxy_only_performance=metadata.get('proxy_only_performance', ''),
         source_proxy_only_raw=metadata.get('proxy_only_raw', ''),
         source_ntk_condition=metadata.get('ntk_condition', ''),
         source_zico=metadata.get('zico', ''),
@@ -476,8 +476,8 @@ def main():
                 config_path=path,
                 source_size=metadata.get('size', ''),
                 source_flops=metadata.get('flops', ''),
-                source_proxy_only_quality=metadata.get(
-                    'proxy_only_quality', ''),
+                source_proxy_only_performance=metadata.get(
+                    'proxy_only_performance', ''),
                 source_proxy_only_raw=metadata.get('proxy_only_raw', ''),
                 source_ntk_condition=metadata.get('ntk_condition', ''),
                 source_zico=metadata.get('zico', ''),

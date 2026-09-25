@@ -8,7 +8,7 @@ PYTHONPATH="${PWD}" "${PYTHON_BIN}" -m unittest discover -s tests -v
 TEMP_DIR="$(mktemp -d)"
 trap 'find "${TEMP_DIR}" -type f -delete; rmdir "${TEMP_DIR}"' EXIT
 cat > "${TEMP_DIR}/archive.csv" <<'CSV'
-candidate,total_quality,size,flops
+candidate,performance,parameters,flops
 a,10,4,4
 b,9,3,3
 c,8,5,5

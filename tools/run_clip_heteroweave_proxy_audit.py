@@ -117,8 +117,8 @@ def proxy_scores(model, teacher, collaboration, processor, dataset, device,
     logits = logit_scale * images @ texts.t()
     swap_sqrt = np.sqrt(np.asarray(swap_counts, dtype=float))
     return {
-        "fused_layer_swap_sqrt": float(swap_sqrt.mean()),
-        "fused_layer_swap_sqrt_std": float(swap_sqrt.std(ddof=1)),
+        "fused_CLAS": float(swap_sqrt.mean()),
+        "fused_CLAS_std": float(swap_sqrt.std(ddof=1)),
         "fused_pattern_count_mean": float(np.mean(swap_counts)),
         "fused_pattern_counts": json.dumps(swap_counts),
         "contrastive_loss": float(symmetric_clip_loss(logits)),
@@ -204,8 +204,8 @@ def main():
                    for i in args.blocks}
 
     output = Path(args.output); output.parent.mkdir(parents=True, exist_ok=True)
-    fields = ["candidate", "block", "donor", "gate", "fused_layer_swap_sqrt",
-              "fused_layer_swap_sqrt_std", "fused_pattern_count_mean",
+    fields = ["candidate", "block", "donor", "gate", "fused_CLAS",
+              "fused_CLAS_std", "fused_pattern_count_mean",
               "fused_pattern_counts", "contrastive_loss", "alignment_drift",
               "i2t_r1", "t2i_r1", "i2t_r5", "t2i_r5", "i2t_r10",
               "t2i_r10", "mean_recall", "elapsed_sec", "status"]
@@ -240,7 +240,7 @@ def main():
                     del collaboration; torch.cuda.empty_cache()
 
     target = np.asarray([x["mean_recall"] for x in rows])
-    swap = np.asarray([x["fused_layer_swap_sqrt"] for x in rows])
+    swap = np.asarray([x["fused_CLAS"] for x in rows])
     loss = np.asarray([x["contrastive_loss"] for x in rows])
     drift = np.asarray([x["alignment_drift"] for x in rows])
     composite = zscore(swap) - zscore(loss) - zscore(drift)
@@ -250,7 +250,7 @@ def main():
         "validation_images": len(validation),
         "swap_panel_indices": swap_panels,
         "proxy_pair_indices": pair_indices,
-        "spearman_layer_swap": float(spearmanr(swap, target).statistic),
+        "spearman_CLAS": float(spearmanr(swap, target).statistic),
         "spearman_negative_contrastive": float(spearmanr(-loss, target).statistic),
         "spearman_negative_alignment": float(spearmanr(-drift, target).statistic),
         "spearman_equal_weight_composite": float(spearmanr(composite, target).statistic),

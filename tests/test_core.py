@@ -11,7 +11,7 @@ from heteroweave import (
 )
 
 
-class ClasTest(unittest.TestCase):
+class CLASTest(unittest.TestCase):
     def test_square_root_aggregation(self):
         self.assertAlmostEqual(clas_from_pattern_counts([4, 9]), 5.0)
 

@@ -139,8 +139,8 @@ def proxies(model, teacher, module, processor, dataset, device,
     logits = model.logit_scale.exp().detach().cpu() * images @ texts.t()
     sqrt_counts = np.sqrt(np.asarray(counts, dtype=float))
     return {
-        "layer_swap_sqrt": float(sqrt_counts.mean()),
-        "layer_swap_panel_std": float(sqrt_counts.std(ddof=1)),
+        "CLAS": float(sqrt_counts.mean()),
+        "CLAS_panel_std": float(sqrt_counts.std(ddof=1)),
         "pattern_counts": json.dumps(counts),
         "contrastive_loss": float(symmetric_clip_loss(logits)),
         "alignment_drift": float((1.0 - F.cosine_similarity(images, targets)).mean()),
@@ -212,7 +212,7 @@ def main():
 
     fields = ["candidate", "tag", "block", "donors", "gate", "adapter", "width",
               "fusion", "trainable_params", "added_params", "added_flops",
-              "layer_swap_sqrt", "layer_swap_panel_std", "pattern_counts",
+              "CLAS", "CLAS_panel_std", "pattern_counts",
               "contrastive_loss", "alignment_drift", "i2t_r1", "t2i_r1",
               "i2t_r5", "t2i_r5", "i2t_r10", "t2i_r10", "mean_recall",
               "elapsed_sec", "seed", "manifest_sha256", "status"]
@@ -232,8 +232,8 @@ def main():
                 row = {"candidate": c["id"], "tag": c["tag"], "block": "",
                        "donors": "", "gate": 0, "adapter": "none", "width": 0,
                        "fusion": "none", "trainable_params": 0, "added_params": 0,
-                       "added_flops": 0, "layer_swap_sqrt": "",
-                       "layer_swap_panel_std": "", "pattern_counts": "",
+                       "added_flops": 0, "CLAS": "",
+                       "CLAS_panel_std": "", "pattern_counts": "",
                        "contrastive_loss": "", "alignment_drift": "", **baseline,
                        "elapsed_sec": time.time() - started, "seed": args.seed,
                        "manifest_sha256": manifest["manifest_sha256"], "status": "ok"}

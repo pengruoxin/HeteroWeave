@@ -68,7 +68,7 @@ def calculate_normalized_zico(
     Original ZiCo computes ``log(sum(mean(|g|) / std(g)))`` per layer and
     sums this value over layers.  The ``sum`` term injects an explicit
     parameter-count factor: a wider layer can score higher even when the
-    average gradient signal quality is unchanged.
+    average gradient signal statistics are unchanged.
 
     This variant keeps the same gradient signal ratio but changes only the
     internal aggregation:

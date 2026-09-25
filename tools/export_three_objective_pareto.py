@@ -7,7 +7,7 @@ import os
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description='Export a readable Pareto table for total_quality, size, and flops.')
+        description='Export a readable Pareto table for performance, parameters, and FLOPs.')
     parser.add_argument('--input', required=True, help='Input summary/final_pareto CSV.')
     parser.add_argument('--output', required=True, help='Output readable Pareto CSV.')
     parser.add_argument(
@@ -39,29 +39,29 @@ def is_eligible(row):
     if row.get('budget_status') == 'out_of_budget':
         return False
     return (
-        math.isfinite(as_float(row.get('total_quality'))) and
-        math.isfinite(as_float(row.get('size'))) and
+        math.isfinite(as_float(row.get('performance'))) and
+        math.isfinite(as_float(row.get('parameters'))) and
         math.isfinite(as_float(row.get('flops'))))
 
 
 def objective_values(row):
     return (
-        as_float(row.get('total_quality')),
-        as_float(row.get('size')),
+        as_float(row.get('performance')),
+        as_float(row.get('parameters')),
         as_float(row.get('flops')),
     )
 
 
 def dominates(left, right):
-    left_q, left_size, left_flops = objective_values(left)
-    right_q, right_size, right_flops = objective_values(right)
+    left_performance, left_parameters, left_flops = objective_values(left)
+    right_performance, right_parameters, right_flops = objective_values(right)
     no_worse = (
-        left_q >= right_q and
-        left_size <= right_size and
+        left_performance >= right_performance and
+        left_parameters <= right_parameters and
         left_flops <= right_flops)
     strictly_better = (
-        left_q > right_q or
-        left_size < right_size or
+        left_performance > right_performance or
+        left_parameters < right_parameters or
         left_flops < right_flops)
     return no_worse and strictly_better
 
@@ -87,8 +87,8 @@ def assign_pareto_ranks(rows):
 def normalized_minimize_values(front):
     values = []
     for row in front:
-        quality, size, flops = objective_values(row)
-        values.append((-quality, size, flops))
+        performance, parameters, flops = objective_values(row)
+        values.append((-performance, parameters, flops))
     mins = [min(vector[i] for vector in values) for i in range(3)]
     maxs = [max(vector[i] for vector in values) for i in range(3)]
     normalized = []
@@ -103,8 +103,8 @@ def normalized_minimize_values(front):
 
 def mark_special_points(rows):
     for row in rows:
-        row['is_top_total_quality'] = False
-        row['is_min_size'] = False
+        row['is_top_performance'] = False
+        row['is_min_parameters'] = False
         row['is_min_flops'] = False
         row['is_three_objective_knee'] = False
         row['three_objective_knee_asf'] = ''
@@ -113,8 +113,8 @@ def mark_special_points(rows):
     if not rows:
         return
 
-    max_quality = max(as_float(row.get('total_quality')) for row in rows)
-    min_size = min(as_float(row.get('size')) for row in rows)
+    max_performance = max(as_float(row.get('performance')) for row in rows)
+    min_parameters = min(as_float(row.get('parameters')) for row in rows)
     min_flops = min(as_float(row.get('flops')) for row in rows)
     eps = 1e-12
 
@@ -132,12 +132,12 @@ def mark_special_points(rows):
 
     for row in rows:
         roles = []
-        if abs(as_float(row.get('total_quality')) - max_quality) <= eps:
-            row['is_top_total_quality'] = True
-            roles.append('top_total_quality')
-        if abs(as_float(row.get('size')) - min_size) <= eps:
-            row['is_min_size'] = True
-            roles.append('min_size')
+        if abs(as_float(row.get('performance')) - max_performance) <= eps:
+            row['is_top_performance'] = True
+            roles.append('top_performance')
+        if abs(as_float(row.get('parameters')) - min_parameters) <= eps:
+            row['is_min_parameters'] = True
+            roles.append('min_parameters')
         if abs(as_float(row.get('flops')) - min_flops) <= eps:
             row['is_min_flops'] = True
             roles.append('min_flops')
@@ -151,11 +151,11 @@ def sort_rows(rows):
         return (
             int(row.get('three_objective_pareto_rank', 999999)),
             not truth(row.get('is_three_objective_knee')),
-            not truth(row.get('is_top_total_quality')),
-            not truth(row.get('is_min_size')),
+            not truth(row.get('is_top_performance')),
+            not truth(row.get('is_min_parameters')),
             not truth(row.get('is_min_flops')),
-            -as_float(row.get('total_quality'), -math.inf),
-            as_float(row.get('size'), math.inf),
+            -as_float(row.get('performance'), -math.inf),
+            as_float(row.get('parameters'), math.inf),
             as_float(row.get('flops'), math.inf),
             row_name(row),
         )
@@ -169,15 +169,15 @@ def write_csv(path, rows):
         'selection_role',
         'candidate',
         'config_path',
-        'total_quality',
-        'size',
+        'performance',
+        'parameters',
         'flops',
         'three_objective_pareto_rank',
         'is_three_objective_pareto',
         'is_three_objective_knee',
         'three_objective_knee_asf',
-        'is_top_total_quality',
-        'is_min_size',
+        'is_top_performance',
+        'is_min_parameters',
         'is_min_flops',
     ]
     fields = []
@@ -213,8 +213,8 @@ def main():
         role = row.get('selection_role') or 'front'
         print(
             f'{row["readable_rank"]}: {row_name(row)} role={role} '
-            f'Q={as_float(row.get("total_quality")):.4f} '
-            f'size={as_float(row.get("size")):.6g} '
+            f'performance={as_float(row.get("performance")):.4f} '
+            f'parameters={as_float(row.get("parameters")):.6g} '
             f'flops={as_float(row.get("flops")):.6g}')
 
 

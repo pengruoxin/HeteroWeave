@@ -27,7 +27,7 @@ nonempty subset constraint. If one pretrained source is instantiated twice,
 the instances must have distinct identifiers; repeating one identifier is not
 representable as a mathematical set.
 
-## Clas
+## CLAS
 
 `heteroweave/clas.py` states the proxy calculation without framework
 dependencies. The experiment implementation collects binary activation
@@ -39,17 +39,23 @@ to position-level counts. Full hooks are in:
 - `PositionLayerSwapCollector` in `tools/run_deeplab_heteroweave_search.py`;
 - `tools/evaluate_detection_formal_proxy.py` for detection.
 
-The name `layer_swap_sqrt` remains in historical CLI flags and records. It
-denotes the proxy called **Clas** in the paper.
+The paper-facing proxy name is **CLAS**. A low-level internal score key,
+`layer_swap_sqrt`, is retained only inside legacy activation-counting utilities;
+public search commands and exported records use **CLAS**.
 
 ## Three-objective search
 
-The objective directions are: maximize Clas, minimize parameter count, and
-minimize FLOPs. `tools/search_nsga3_multiobj.py` contains the NSGA-III search
-and genotype operators. `simlarity/multi_objective.py` contains the original
-general ranking helpers; `heteroweave/pareto.py` is the concise reviewer-facing
-reference implementation.
+The paper-level objective directions are: maximize trained performance,
+minimize parameter count, and minimize FLOPs. Because trained performance is
+not available for every search candidate, **CLAS** is used only as its
+training-free proxy during search; parameter count and FLOPs are computed
+directly from each candidate. The search therefore optimizes
+`[maximize CLAS, minimize parameters, minimize FLOPs]`.
+`tools/search_nsga3_multiobj.py` contains the NSGA-III search and genotype
+operators. `simlarity/multi_objective.py` contains the original general ranking
+helpers; `heteroweave/pareto.py` is the concise reviewer-facing reference
+implementation.
 
 Representative selection must be performed only after strict nondominance is
-computed. Quality and efficiency labels describe selected operating points;
+computed. Performance and efficiency labels describe selected operating points;
 they are not separate training methods.

@@ -119,6 +119,10 @@ python tools/search_nsga3_multiobj.py --toy \
 | Detection | ResNet-50, D1, D2, D3 | `configs/detection/paper_models.py` |
 | Analysis | DeRy, serial extension, parallel composition | `configs/analysis/` |
 
+Pretrained checkpoint identifiers, original download links, loading instructions,
+and available full SHA-256 checksums are documented in
+[Pretrained weights](docs/PRETRAINED_WEIGHTS.md).
+
 ## Training
 
 After preparing ImageNet and the required public pretrained weights, train the

@@ -71,12 +71,23 @@ bash scripts/train_imagenet_models.sh 8 heteroweave
 
 ## Auxiliary tasks
 
-The paper-model launchers are:
+After preparing the datasets and public pretrained weights, use the task-specific
+protocol and training commands below. Replace the dataset paths and checkpoint
+placeholders with local files:
 
 ```bash
-bash scripts/train_retrieval_models.sh
-bash scripts/train_segmentation_models.sh
-bash scripts/train_detection_models.sh
+bash scripts/train_retrieval_models.sh MAE.pth DINO.pth work_dirs/retrieval
+
+python tools/run_deeplab_heteroweave_search.py protocol \
+  --data /path/to/oxford-iiit-pet --output work_dirs/segmentation_protocol.json
+bash scripts/train_segmentation_models.sh \
+  /path/to/oxford-iiit-pet work_dirs/segmentation_protocol.json \
+  RESNET50.pth BYOL.pth DINO.pth SWAV.pth work_dirs/segmentation
+
+python tools/freeze_detection_protocol.py \
+  --voc-root /path/to/VOC --output work_dirs/detection_protocol.json
+bash scripts/train_detection_models.sh \
+  /path/to/VOC BYOL.pth work_dirs/detection_protocol.json work_dirs/detection
 ```
 
 Detection entry points expect a protocol manifest that defines the candidate

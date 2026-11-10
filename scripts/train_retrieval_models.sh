@@ -21,7 +21,7 @@ for SEED in 0 1 2; do
     --manifest "${MANIFEST}" \
     --mae "${MAE_CHECKPOINT}" \
     --dino "${DINO_CHECKPOINT}" \
-    --steps 0 --only-tags baseline main --batch-size 32 --seed "${SEED}" \
+    --steps 1000 --batch-size 32 --lr 0.003 --seed "${SEED}" \
     --output "${OUTPUT_DIR}/seed${SEED}.csv"
 done
 

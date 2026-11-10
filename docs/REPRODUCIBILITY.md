@@ -95,36 +95,6 @@ architecture and frozen split. Do not substitute an output table for that
 manifest. Retrieval may download Flickr8K and public model weights through
 Hugging Face unless an offline cache is configured.
 
-### Retrieval
-
-`configs/retrieval/paper_models.py` specifies the three frozen compositions:
-
-| Model | CLIP insertion layer (zero-based) | Source blocks | Fixed gates |
-|---|---:|---|---|
-| HeteroWeave R1 | 10 | MAE block 10 | 0.05 |
-| HeteroWeave R2 | 10 | MAE block 10 + DINO block 10 | 0.05 / 0.01 |
-| HeteroWeave R3 | 10 | MAE block 10 + MAE block 10 | 0.025 / 0.025 |
-
-For input `h`, let `c = CLIP_layer(h)` and `u_i = source_block_i(h) - h`.
-The interface returns `c + sum_i gate_i * aligned_i`, where
-`aligned_i = u_i * RMS(c - h) / max(RMS(u_i), 1e-6)`.
-RMS is computed independently for each token over its feature channels, using
-float32 accumulation. The interface and fixed gates introduce no trainable
-parameters; the CLIP backbone and source blocks are also frozen.
-R3's identical MAE branches therefore equal one MAE branch with gate 0.05.
-
-`scripts/train_retrieval_models.sh` evaluates CLIP and R1--R3 with zero training
-steps on the 1,000-image Flickr8K validation split (five captions per image).
-It records image-to-text and text-to-image Recall@1/5/10 and their mean.
-The three seeds produce deterministic evaluations for these frozen models;
-they do not represent independent training runs. The gate settings were
-selected on validation, so this evaluation is not an independent test result.
-Adapter controls remain defined in the configuration and can be selected
-explicitly with `--only-ids` in the Python runner.
-
-Resource output reports added source-block parameters and donor-block MAC
-estimates; the latter exclude elementwise RMS alignment and fusion operations.
-
 ## Resource accounting
 
 Report whether resources are total or added relative to the task backbone.

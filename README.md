@@ -117,6 +117,14 @@ it does not denote zero resource use.
 
 Each linked task configuration contains all candidate IDs listed for that task.
 
+Retrieval R1--R3 retain the CLIP ViT-B/16 backbone and insert source blocks at
+visual layer 10 (zero-based). Each source residual is aligned to the per-token
+RMS amplitude of the CLIP layer residual, then fused with a fixed gate.
+R1 uses MAE with gate 0.05; R2 uses MAE/DINO with gates 0.05/0.01;
+R3 uses two MAE branches with gate 0.025 each. All weights and gates are frozen;
+the RMS interface has no trainable parameters. See the
+[retrieval protocol](docs/REPRODUCIBILITY.md#retrieval) for execution details.
+
 | Task | Model / control | Candidate ID | Configuration |
 |---|---|---|---|
 | Retrieval | CLIP baseline | `clip` | [retrieval/paper_models.py](configs/retrieval/paper_models.py) |

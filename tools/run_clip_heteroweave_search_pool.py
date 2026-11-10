@@ -21,6 +21,7 @@ import timm
 
 from run_clip_heteroweave_multimodal import batches, symmetric_clip_loss
 from run_clip_heteroweave_proxy_audit import load_donor, encode_texts, retrieval
+from retrieval_rms import MultiRMSLayer
 
 
 class DonorAdapter(nn.Module):
@@ -84,6 +85,8 @@ class MultiDonorCollaborativeLayer(nn.Module):
 def train_short(model, teacher, module, processor, dataset, device,
                 steps, batch_size, lr, seed):
     trainable = [p for p in module.parameters() if p.requires_grad]
+    if steps <= 0 or not trainable:
+        return
     optimizer = torch.optim.AdamW(trainable, lr=lr, weight_decay=1e-4)
     scaler = torch.cuda.amp.GradScaler()
     model.eval(); teacher.eval()
@@ -149,6 +152,12 @@ def proxies(model, teacher, module, processor, dataset, device,
 
 def cost(module, token_count=197, dim=768):
     trainable = sum(p.numel() for p in module.parameters() if p.requires_grad)
+    if isinstance(module, MultiRMSLayer):
+        added = sum(p.numel() for donor in module.donors for p in donor.parameters())
+        # Donor-block MACs; elementwise RMS and fusion operations are excluded.
+        flops = len(module.donors) * (
+            12 * token_count * dim * dim + 2 * token_count * token_count * dim)
+        return trainable, added, flops
     added = sum(p.numel() for b in module.branches for p in b.parameters())
     flops = 0
     for branch in module.branches:
@@ -201,7 +210,10 @@ def main():
     donors = {"mae": load_donor(args.mae), "dino": load_donor(args.dino),
               "random": random_donor, "adapter_only": random_donor}
     data = load_dataset("jxie/flickr8k")
-    train = data["train"].select(range(min(args.train_images, len(data["train"]))))
+    train = None
+    if args.steps > 0:
+        train_count = min(args.train_images, len(data["train"]))
+        train = data["train"].select(range(train_count))
     validation = data["validation"].select(range(min(
         args.validation_images, len(data["validation"]))))
     order = np.random.default_rng(0).permutation(len(validation)).tolist()
@@ -243,10 +255,16 @@ def main():
                 donor_blocks = [
                     nn.Identity() if d == "adapter_only" else
                     copy.deepcopy(donors[d].blocks[block]) for d in c["donors"]]
-                module = MultiDonorCollaborativeLayer(
-                    original, donor_blocks,
-                    768, c["gate"], c["adapter"], c["width"], c["fusion"],
-                    [d == "adapter_only" for d in c["donors"]]).to(device)
+                if c["adapter"] == "rms":
+                    if c["fusion"] != "sum" or "adapter_only" in c["donors"]:
+                        raise ValueError("RMS requires source blocks and sum fusion")
+                    gates = c["gate"] if isinstance(c["gate"], list) else [c["gate"]] * len(donor_blocks)
+                    module = MultiRMSLayer(original, donor_blocks, gates).to(device)
+                else:
+                    module = MultiDonorCollaborativeLayer(
+                        original, donor_blocks,
+                        768, c["gate"], c["adapter"], c["width"], c["fusion"],
+                        [d == "adapter_only" for d in c["donors"]]).to(device)
                 model.vision_model.encoder.layers[block] = module
                 proxy = proxies(model, teacher, module, processor, validation, device,
                                 swap_panels, pair_indices)

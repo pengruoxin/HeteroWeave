@@ -79,17 +79,69 @@ for retrieval, segmentation, and detection.
 
 ## Paper model inventory
 
-| Model | Resource budget | Configuration |
+The links below provide the complete architecture configurations for the paper
+models and baselines. ImageNet configurations specify source-block selections,
+interfaces, and training settings. Auxiliary-task configurations define each
+candidate by its ID, insertion position, source components, and fusion settings.
+
+Pretrained source-model identifiers, download links, loading instructions, and
+available SHA-256 checksums are listed in the
+[checkpoint guide](docs/PRETRAINED_WEIGHTS.md). Dataset preparation and execution
+commands are in the [reproducibility guide](docs/REPRODUCIBILITY.md).
+
+### ImageNet classification
+
+| Model | Search resource budget | Complete configuration |
 |---|---|---|
 | HeteroWeave-P | 10M / 3G | [heteroweave_p_10m3g_100e.py](configs/imagenet/heteroweave_p_10m3g_100e.py) |
 | HeteroWeave-E | 10M / 3G | [heteroweave_e_10m3g_100e.py](configs/imagenet/heteroweave_e_10m3g_100e.py) |
 | HeteroWeave | 30M / 6G | [heteroweave_main_100e.py](configs/imagenet/heteroweave_main_100e.py) |
+| DeRy | 10M / 3G | [dery_10m3g_100e.py](configs/imagenet/dery_10m3g_100e.py) |
+| DeRy | 30M / 6G | [dery_baseline_100e.py](configs/imagenet/dery_baseline_100e.py) |
+| Model Stitching | 10M / 3G | [model_stitching_10m3g_100e.py](configs/baselines/imagenet/model_stitching_10m3g_100e.py) |
+| Model Stitching | 30M / 6G | [model_stitching_30m6g_100e.py](configs/baselines/imagenet/model_stitching_30m6g_100e.py) |
+| Side-Tuning | 10M / 3G | [side_tuning_10m3g_100e.py](configs/baselines/imagenet/side_tuning_10m3g_100e.py) |
+| Side-Tuning | 30M / 6G | [side_tuning_30m6g_100e.py](configs/baselines/imagenet/side_tuning_30m6g_100e.py) |
+| SN-Net (3Ti–9S) | — | [snnet_3ti9s_100e.py](configs/baselines/imagenet/snnet_3ti9s_100e.py) |
+| SN-Net (9Ti–3S) | — | [snnet_9ti3s_100e.py](configs/baselines/imagenet/snnet_9ti3s_100e.py) |
+| RegNetY-800MF | — | [regnet_y_800mf_100e.py](configs/references/imagenet/regnet_y_800mf_100e.py) |
+| MobileNetV3-Large | — | [mobilenet_v3_large_100e.py](configs/references/imagenet/mobilenet_v3_large_100e.py) |
+| RegNetY-3.2GF | — | [regnet_y_3_2gf_100e.py](configs/references/imagenet/regnet_y_3_2gf_100e.py) |
+| ResNet-50 | — | [resnet50_100e.py](configs/references/imagenet/resnet50_100e.py) |
+| Swin-T | — | [swin_tiny_100e.py](configs/references/imagenet/swin_tiny_100e.py) |
 
-The [complete inventory](docs/MODEL_INVENTORY.md) also lists DeRy, Model
-Stitching, Side-Tuning, SN-Net, complete-network references, auxiliary-task
-models, and capacity-matched controls. The
-[checkpoint guide](docs/PRETRAINED_WEIGHTS.md) records source-model identifiers,
-download links, loading instructions, and available SHA-256 checksums.
+A dash indicates that no search-budget label is assigned to that reference row;
+it does not denote zero resource use.
+
+### Retrieval, segmentation, and detection
+
+Each linked task configuration contains all candidate IDs listed for that task.
+
+| Task | Model / control | Candidate ID | Configuration |
+|---|---|---|---|
+| Retrieval | CLIP baseline | `clip` | [retrieval/paper_models.py](configs/retrieval/paper_models.py) |
+| Retrieval | HeteroWeave R1 | `heteroweave_r1` | [retrieval/paper_models.py](configs/retrieval/paper_models.py) |
+| Retrieval | HeteroWeave R2 | `heteroweave_r2` | [retrieval/paper_models.py](configs/retrieval/paper_models.py) |
+| Retrieval | HeteroWeave R3 | `heteroweave_r3` | [retrieval/paper_models.py](configs/retrieval/paper_models.py) |
+| Retrieval | Wider adapter control | `wider_adapter` | [retrieval/paper_models.py](configs/retrieval/paper_models.py) |
+| Retrieval | Parallel adapters control | `parallel_adapters` | [retrieval/paper_models.py](configs/retrieval/paper_models.py) |
+| Segmentation | ResNet-50 baseline | `resnet50` | [segmentation/paper_models.py](configs/segmentation/paper_models.py) |
+| Segmentation | HeteroWeave S1 (capacity control) | `heteroweave_s1` | [segmentation/paper_models.py](configs/segmentation/paper_models.py) |
+| Segmentation | HeteroWeave S2 (source control) | `heteroweave_s2` | [segmentation/paper_models.py](configs/segmentation/paper_models.py) |
+| Segmentation | HeteroWeave S3 | `heteroweave_s3` | [segmentation/paper_models.py](configs/segmentation/paper_models.py) |
+| Segmentation | HeteroWeave S4 | `heteroweave_s4` | [segmentation/paper_models.py](configs/segmentation/paper_models.py) |
+| Detection | ResNet-50 baseline | `resnet50` | [detection/paper_models.py](configs/detection/paper_models.py) |
+| Detection | HeteroWeave D1 | `heteroweave_d1` | [detection/paper_models.py](configs/detection/paper_models.py) |
+| Detection | HeteroWeave D2 | `heteroweave_d2` | [detection/paper_models.py](configs/detection/paper_models.py) |
+| Detection | HeteroWeave D3 | `heteroweave_d3` | [detection/paper_models.py](configs/detection/paper_models.py) |
+
+### Capacity-matched analysis
+
+| Model / control | Complete configuration |
+|---|---|
+| DeRy serial path | [dery_baseline_100e.py](configs/imagenet/dery_baseline_100e.py) |
+| Capacity-matched serial extension | [capacity_serial_100e.py](configs/analysis/capacity_serial_100e.py) |
+| Capacity-matched parallel composition | [capacity_parallel_100e.py](configs/analysis/capacity_parallel_100e.py) |
 
 ## Full-training proxy evidence
 

@@ -1,0 +1,71 @@
+{
+  "fetched_at": "2026-11-09T18:53:20.660083",
+  "sources": [
+    {
+      "file": "grad_norm.py",
+      "url": "https://raw.githubusercontent.com/mohsaied/zero-cost-nas/main/foresight/pruners/measures/grad_norm.py",
+      "sha256": "9c9d05252d7b2e7bf50835b29e3d44f527910d62308ce8892d62e84a13b22b33",
+      "bytes": 1364
+    },
+    {
+      "file": "snip.py",
+      "url": "https://raw.githubusercontent.com/mohsaied/zero-cost-nas/main/foresight/pruners/measures/snip.py",
+      "sha256": "fcc922052618ff1c1d1f3b185754f5f087428865de6e651208a9b5d8b495752d",
+      "bytes": 2401
+    },
+    {
+      "file": "fisher.py",
+      "url": "https://raw.githubusercontent.com/mohsaied/zero-cost-nas/main/foresight/pruners/measures/fisher.py",
+      "sha256": "b04f65a69b43ea59888daf9650b019e023ab5b0f1d9518e9240d4913da90dd33",
+      "bytes": 4100
+    },
+    {
+      "file": "jacob_cov.py",
+      "url": "https://raw.githubusercontent.com/mohsaied/zero-cost-nas/main/foresight/pruners/measures/jacob_cov.py",
+      "sha256": "99b44e7e6d25ed58bfffc1f552b64986afb1116502cee46bc4a32b96edef9be6",
+      "bytes": 1730
+    },
+    {
+      "file": "synflow.py",
+      "url": "https://raw.githubusercontent.com/mohsaied/zero-cost-nas/main/foresight/pruners/measures/synflow.py",
+      "sha256": "1125d131ab2b2518a5cb96f60017b525511fc489c4a40674ef18319db3c25301",
+      "bytes": 2171
+    },
+    {
+      "file": "p_utils.py",
+      "url": "https://raw.githubusercontent.com/mohsaied/zero-cost-nas/main/foresight/pruners/p_utils.py",
+      "sha256": "abbd53ca5321681b769756110619f49f9a63fd04911c9d44abbb56443ec5b276",
+      "bytes": 2957
+    },
+    {
+      "file": "measures_init.py",
+      "url": "https://raw.githubusercontent.com/mohsaied/zero-cost-nas/main/foresight/pruners/measures/__init__.py",
+      "sha256": "f5fff89e14a4bb0f5629df110f7598540f490345d6717373de3fd61ffcb3bbc1",
+      "bytes": 1905
+    },
+    {
+      "file": "predictive.py",
+      "url": "https://raw.githubusercontent.com/mohsaied/zero-cost-nas/main/foresight/pruners/predictive.py",
+      "sha256": "8e93e767e10c1a156c83fbafa6daa4c738d9d0acddce5cdc3825926b81c8b73a",
+      "bytes": 4440
+    },
+    {
+      "file": "zico_official.py",
+      "url": "https://raw.githubusercontent.com/SLDGroup/ZiCo/main/ZeroShotProxy/compute_zico.py",
+      "sha256": "e84cb93b3c7b3973bb71ea758b9ab9b78b1d5625086ea7c12ce4a386c8285337",
+      "bytes": 2116
+    },
+    {
+      "file": "naswot_search.py",
+      "url": "https://raw.githubusercontent.com/BayesWatch/nas-without-training/master/search.py",
+      "sha256": "eb608a0105ecf0684bafdac5a63cdd703cc4976e30423e31c0360a03e95394cc",
+      "bytes": 7455
+    },
+    {
+      "file": "naswot_score.py",
+      "url": "https://raw.githubusercontent.com/BayesWatch/nas-without-training/master/score_networks.py",
+      "sha256": "99cfd2a34960a9f06500d423dc5a8cd405e9388773c92c7c980e0ff28a80dbf3",
+      "bytes": 6748
+    }
+  ]
+}

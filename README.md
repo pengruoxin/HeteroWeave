@@ -3,7 +3,14 @@
 Lightweight implementation package for **HeteroWeave: Variable-Cardinality
 Composition in Pretrained Model Reassembly**. This repository is organized for
 method inspection and reproduction. It intentionally excludes the paper,
-figures, tables, datasets, checkpoints, logs, and archived experiment outputs.
+figures, datasets, checkpoints, and general experiment archives. A curated
+anonymous evidence package is included for the full-training proxy validation.
+
+## Full-training proxy evidence
+
+The [20-architecture evidence package](evidence/clas_100e_20/README.md) provides
+architecture configurations, completed 100-epoch training logs, raw proxy scores,
+and a standalone verification script, linked through IDs A01–A20.
 
 ## What is included
 

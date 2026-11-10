@@ -1,0 +1,64 @@
+[
+  {
+    "proxy": "SynFlow",
+    "audit_field": [
+      "synflow_reference_eval",
+      "conv_linear_weights_log"
+    ]
+  },
+  {
+    "proxy": "Fisher",
+    "audit_field": [
+      "eval_gradient",
+      "fisher_param_ref"
+    ]
+  },
+  {
+    "proxy": "SNIP",
+    "audit_field": [
+      "eval_gradient",
+      "snip_ref"
+    ]
+  },
+  {
+    "proxy": "GradNorm",
+    "audit_field": [
+      "eval_gradient",
+      "gradnorm_ref"
+    ]
+  },
+  {
+    "proxy": "ZiCo",
+    "audit_field": [
+      "zico_eval",
+      0
+    ]
+  },
+  {
+    "proxy": "NASWOT",
+    "audit_field": [
+      "eval_gradient",
+      "naswot_relu"
+    ]
+  },
+  {
+    "proxy": "Jacov",
+    "audit_field": [
+      "jacov_eval"
+    ]
+  },
+  {
+    "proxy": "CLAS",
+    "audit_field": [
+      "eval_gradient",
+      "clas"
+    ]
+  },
+  {
+    "proxy": "CLAS (no square root)",
+    "audit_field": [
+      "eval_gradient",
+      "no_sqrt"
+    ]
+  }
+]

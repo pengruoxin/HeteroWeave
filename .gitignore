@@ -30,3 +30,9 @@ runs/
 *.pdf
 *.svg
 *.tiff
+
+# Publish the reviewed anonymous evidence package.
+!evidence/clas_100e_20/
+!evidence/clas_100e_20/**/
+!evidence/clas_100e_20/**/*.csv
+!evidence/clas_100e_20/**/*.jsonl
